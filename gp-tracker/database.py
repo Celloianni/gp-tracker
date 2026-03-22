@@ -8,7 +8,6 @@ def get_conn():
 
 def init_db():
     with get_conn() as conn:
-        conn.execute("DROP TABLE IF EXISTS snapshots")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
