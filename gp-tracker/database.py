@@ -85,6 +85,69 @@ def get_progress(guild_id: str):
             "dates": dates
         }
 
+def get_available_months(guild_id: str):
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT DISTINCT substr(snapshot_date, 1, 7) as month
+            FROM snapshots WHERE guild_id = ?
+            ORDER BY month DESC
+        """, (guild_id,)).fetchall()
+        return [r[0] for r in rows]
+
+def get_progress_for_month(guild_id: str, month: str):
+    with get_conn() as conn:
+        # First snapshot of the month
+        first_date = conn.execute("""
+            SELECT MIN(snapshot_date) FROM snapshots
+            WHERE guild_id = ? AND substr(snapshot_date, 1, 7) = ?
+        """, (guild_id, month)).fetchone()[0]
+
+        # Last snapshot of the month
+        last_date = conn.execute("""
+            SELECT MAX(snapshot_date) FROM snapshots
+            WHERE guild_id = ? AND substr(snapshot_date, 1, 7) = ?
+        """, (guild_id, month)).fetchone()[0]
+
+        if not first_date or not last_date:
+            return {"dates": [], "players": [], "latest_date": None, "prev_date": None}
+
+        # If same date — only one snapshot, diff = 0
+        latest = {r[0]: {"name": r[1], "gp": r[2]} for r in conn.execute(
+            "SELECT player_id, player_name, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+            (guild_id, last_date)
+        ).fetchall()}
+
+        prev = {}
+        if first_date != last_date:
+            prev = {r[0]: r[1] for r in conn.execute(
+                "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+                (guild_id, first_date)
+            ).fetchall()}
+
+        players = []
+        for pid, data in latest.items():
+            gp_now = data["gp"]
+            gp_prev = prev.get(pid, gp_now)
+            diff = gp_now - gp_prev
+            players.append({
+                "name": data["name"],
+                "gp": gp_now,
+                "gp_prev": gp_prev,
+                "diff": diff,
+                "diff_pct": round(diff / gp_prev * 100, 2) if gp_prev > 0 else 0
+            })
+
+        players.sort(key=lambda x: x["diff"], reverse=True)
+        for i, p in enumerate(players):
+            p["rank"] = i + 1
+
+        return {
+            "latest_date": last_date,
+            "prev_date": first_date,
+            "players": players,
+            "dates": [first_date, last_date]
+        }
+
 def get_friends_history(player_ids: list):
     with get_conn() as conn:
         placeholders = ",".join("?" * len(player_ids))

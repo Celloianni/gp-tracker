@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history
+from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
@@ -197,8 +197,14 @@ async def guilds(auth: bool = Depends(check_auth)):
     return [{"id": g["id"], "name": g["name"]} for g in GUILDS]
 
 @app.get("/api/progress/{guild_id:path}")
-async def progress(guild_id: str, auth: bool = Depends(check_auth)):
+async def progress(guild_id: str, month: str = None, auth: bool = Depends(check_auth)):
+    if month:
+        return get_progress_for_month(guild_id, month)
     return get_progress(guild_id)
+
+@app.get("/api/months/{guild_id:path}")
+async def months(guild_id: str, auth: bool = Depends(check_auth)):
+    return get_available_months(guild_id)
 
 @app.get("/api/friends/history")
 async def friends_history(auth: bool = Depends(check_auth)):
