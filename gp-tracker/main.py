@@ -27,29 +27,30 @@ async def fetch_guild_gp():
         print(f"Найдено игроков: {len(members)}")
 
         players = []
-        for member in members:
+                for member in members:
             player_id = member.get("playerId")
-            name = member.get("playerName", "Unknown")
+            name = member.get("playerName") or member.get("name") or "Unknown"
+            if not player_id:
+                print(f"  Пропускаем — нет playerId: {member}")
+                continue
             try:
                 pr = await client.post(f"{COMLINK_URL}/player", json={
-                    "payload": {"allyCode": None, "playerId": player_id},
+                    "payload": {"playerId": player_id},
                     "enums": False
                 })
                 pr.raise_for_status()
                 pdata = pr.json()
-                gp = pdata.get("profileStat", [{}])
-                # galacticPower is in profileStat list
                 total_gp = 0
                 for stat in pdata.get("profileStat", []):
                     if stat.get("nameKey") == "STAT_GALACTIC_POWER_ACQUIRED_NAME":
-                        total_gp = int(stat.get("value", 0))
+                        total_gp = int(float(stat.get("value", 0)))
                         break
+                name = pdata.get("name") or name
                 players.append({"id": player_id, "name": name, "gp": total_gp})
                 print(f"  {name}: {total_gp:,} GP")
             except Exception as e:
-                print(f"  Ошибка для {name}: {e}")
-                players.append({"id": player_id, "name": name, "gp": 0})
-            await asyncio.sleep(0.1)
+                print(f"  Ошибка для {player_id}: {e}")
+            await asyncio.sleep(0.2)
 
         players_with_gp = [p for p in players if p["gp"] > 0]
         if players_with_gp:
