@@ -63,7 +63,7 @@
   .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #e2e8f0; }
   .modal input { width: 100%; background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 10px 14px; color: #e2e8f0; font-size: 14px; outline: none; margin-bottom: 12px; }
   .modal input:focus { border-color: #7c3aed; }
-  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
   .error-msg { font-size: 13px; color: #f87171; margin-bottom: 10px; }
   .progress-bar-wrap { margin-top: 14px; }
   .progress-bar-label { font-size: 12px; color: #94a3b8; margin-bottom: 6px; display: flex; justify-content: space-between; }
@@ -88,11 +88,8 @@
       </div>
     </div>
     <div class="modal-btns">
-      <button class="btn-sm" @click="showModal=false; password=''; wrongPassword=false">Cancel</button>
-      <button class="btn" @click="collect()" :disabled="collecting">
-        <span x-show="!collecting">Refresh</span>
-        <span class="collecting" x-show="collecting"><span class="spinner"></span> Collecting...</span>
-      </button>
+      <button class="btn-sm" @click="showModal=false">Hide</button>
+      <button class="btn" @click="collect()" :disabled="collecting">Refresh</button>
     </div>
   </div>
 </div>
