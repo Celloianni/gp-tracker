@@ -124,11 +124,11 @@
       <table x-show="!loadingFriends && friendsData.players && friendsData.players.length > 0">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Player</th>
-            <th>GP now</th>
-            <th>GP growth</th>
-            <th>%</th>
+            <th @click="friendsSort('rank')">#</th>
+            <th @click="friendsSort('name')">Player</th>
+            <th @click="friendsSort('gp')">GP now</th>
+            <th @click="friendsSort('diff')">GP growth</th>
+            <th @click="friendsSort('diff_pct')">%</th>
           </tr>
         </thead>
         <tbody>
@@ -223,6 +223,8 @@ function tracker() {
     search: '',
     sortKey: 'diff',
     sortDir: -1,
+    friendsSortKey: 'diff',
+    friendsSortDir: -1,
     showModal: false,
     password: '',
     wrongPassword: false,
@@ -333,7 +335,13 @@ function tracker() {
     },
 
     friendsSorted() {
-      return [...(this.friendsData.players || [])].sort((a, b) => b.diff - a.diff);
+      const players = [...(this.friendsData.players || [])];
+      return players.sort((a, b) => this.friendsSortDir * (a[this.friendsSortKey] > b[this.friendsSortKey] ? 1 : -1));
+    },
+
+    friendsSort(key) {
+      if (this.friendsSortKey === key) this.friendsSortDir *= -1;
+      else { this.friendsSortKey = key; this.friendsSortDir = -1; }
     },
 
     guildFiltered() {
