@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import date, timedelta
+from datetime import date
 
 DB_PATH = "/data/gp_tracker.db"
 
@@ -12,22 +12,23 @@ def init_db():
             CREATE TABLE IF NOT EXISTS snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 snapshot_date TEXT NOT NULL,
+                guild_id TEXT NOT NULL,
                 player_id TEXT NOT NULL,
                 player_name TEXT NOT NULL,
                 gp INTEGER NOT NULL,
-                UNIQUE(snapshot_date, player_id)
+                UNIQUE(snapshot_date, guild_id, player_id)
             )
         """)
         conn.commit()
 
-def save_snapshot(players: list):
+def save_snapshot(guild_id: str, players: list):
     today = str(date.today())
     with get_conn() as conn:
         for p in players:
             conn.execute("""
-                INSERT OR REPLACE INTO snapshots (snapshot_date, player_id, player_name, gp)
-                VALUES (?, ?, ?, ?)
-            """, (today, p["id"], p["name"], p["gp"]))
+                INSERT OR REPLACE INTO snapshots (snapshot_date, guild_id, player_id, player_name, gp)
+                VALUES (?, ?, ?, ?, ?)
+            """, (today, guild_id, p["id"], p["name"], p["gp"]))
         conn.commit()
 
 def is_empty():
@@ -35,31 +36,29 @@ def is_empty():
         row = conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()
         return row[0] == 0
 
-def get_progress():
+def get_progress(guild_id: str):
     with get_conn() as conn:
-        # Берём все доступные даты
         dates = [r[0] for r in conn.execute(
-            "SELECT DISTINCT snapshot_date FROM snapshots ORDER BY snapshot_date DESC LIMIT 30"
+            "SELECT DISTINCT snapshot_date FROM snapshots WHERE guild_id = ? ORDER BY snapshot_date DESC LIMIT 30",
+            (guild_id,)
         ).fetchall()]
 
         if not dates:
-            return {"dates": [], "players": []}
+            return {"dates": [], "players": [], "latest_date": None, "prev_date": None}
 
         latest_date = dates[0]
         prev_date = dates[1] if len(dates) > 1 else None
 
-        # Данные за последний день
         latest = {r[0]: {"name": r[1], "gp": r[2]} for r in conn.execute(
-            "SELECT player_id, player_name, gp FROM snapshots WHERE snapshot_date = ?",
-            (latest_date,)
+            "SELECT player_id, player_name, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+            (guild_id, latest_date)
         ).fetchall()}
 
-        # Данные за предыдущий день
         prev = {}
         if prev_date:
             prev = {r[0]: r[1] for r in conn.execute(
-                "SELECT player_id, gp FROM snapshots WHERE snapshot_date = ?",
-                (prev_date,)
+                "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+                (guild_id, prev_date)
             ).fetchall()}
 
         players = []
@@ -75,7 +74,6 @@ def get_progress():
                 "diff_pct": round(diff / gp_prev * 100, 2) if gp_prev > 0 else 0
             })
 
-        # Сортируем по приросту (больший прирост — выше)
         players.sort(key=lambda x: x["diff"], reverse=True)
         for i, p in enumerate(players):
             p["rank"] = i + 1
