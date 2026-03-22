@@ -14,7 +14,7 @@ GUILD_ID = os.getenv("GUILD_ID", "fJXYTxpsS9iZvGj2M1OUGw")
 
 async def fetch_guild_gp():
     print(f"[{date.today()}] Начинаем сбор данных по гильдии...")
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=120) as client:
         # Получаем список игроков гильдии
         r = await client.post(f"{COMLINK_URL}/guild", json={
             "payload": {"guildId": GUILD_ID},
@@ -30,14 +30,33 @@ async def fetch_guild_gp():
         for member in members:
             player_id = member.get("playerId")
             name = member.get("playerName", "Unknown")
-            gp = member.get("galacticPower", 0)
-            players.append({"id": player_id, "name": name, "gp": int(gp)})
+            try:
+                pr = await client.post(f"{COMLINK_URL}/player", json={
+                    "payload": {"allyCode": None, "playerId": player_id},
+                    "enums": False
+                })
+                pr.raise_for_status()
+                pdata = pr.json()
+                gp = pdata.get("profileStat", [{}])
+                # galacticPower is in profileStat list
+                total_gp = 0
+                for stat in pdata.get("profileStat", []):
+                    if stat.get("nameKey") == "STAT_GALACTIC_POWER_ACQUIRED_NAME":
+                        total_gp = int(stat.get("value", 0))
+                        break
+                players.append({"id": player_id, "name": name, "gp": total_gp})
+                print(f"  {name}: {total_gp:,} GP")
+            except Exception as e:
+                print(f"  Ошибка для {name}: {e}")
+                players.append({"id": player_id, "name": name, "gp": 0})
+            await asyncio.sleep(0.1)
 
-        if players:
-            save_snapshot(players)
-            print(f"Сохранено {len(players)} игроков.")
+        players_with_gp = [p for p in players if p["gp"] > 0]
+        if players_with_gp:
+            save_snapshot(players_with_gp)
+            print(f"Сохранено {len(players_with_gp)} игроков.")
         else:
-            print("Игроки не найдены, данные не сохранены.")
+            print("GP не найден ни у одного игрока.")
 
 scheduler = AsyncIOScheduler()
 
