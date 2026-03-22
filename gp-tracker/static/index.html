@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GP Tracker — Прогресс гильдии</title>
+<title>GP Tracker — Guild Progress</title>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -62,14 +62,14 @@
 <!-- Password modal -->
 <div class="modal-bg" x-show="showModal" @keydown.escape.window="showModal=false">
   <div class="modal">
-    <h2>Обновить данные</h2>
-    <input type="password" placeholder="Введите пароль" x-model="password" @keydown.enter="collect()" autofocus>
-    <div class="error-msg" x-show="wrongPassword">Неверный пароль</div>
+    <h2>Refresh data</h2>
+    <input type="password" placeholder="Enter password" x-model="password" @keydown.enter="collect()" autofocus>
+    <div class="error-msg" x-show="wrongPassword">Wrong password</div>
     <div class="modal-btns">
-      <button class="btn-sm" @click="showModal=false; password=''; wrongPassword=false">Отмена</button>
+      <button class="btn-sm" @click="showModal=false; password=''; wrongPassword=false">Cancel</button>
       <button class="btn" @click="collect()" :disabled="collecting">
         <span x-show="!collecting">Обновить</span>
-        <span class="collecting" x-show="collecting"><span class="spinner"></span> Собираем...</span>
+        <span class="collecting" x-show="collecting"><span class="spinner"></span> Collecting...</span>
       </button>
     </div>
   </div>
@@ -81,7 +81,7 @@
     <div class="dates" x-show="data.latest_date">
       <span x-text="data.prev_date ? data.prev_date + ' → ' + data.latest_date : data.latest_date"></span>
     </div>
-    <button class="btn" @click="showModal=true; wrongPassword=false">Обновить данные</button>
+    <button class="btn" @click="showModal=true; wrongPassword=false">Refresh data</button>
   </div>
 </div>
 
@@ -102,14 +102,14 @@
   </div>
 
   <div class="toolbar">
-    <input class="search" type="text" placeholder="Поиск игрока..." x-model="search">
-    <span style="font-size:13px;color:#64748b;" x-text="filtered().length + ' игроков'"></span>
+    <input class="search" type="text" placeholder="Search player..." x-model="search">
+    <span style="font-size:13px;color:#64748b;" x-text="filtered().length + ' players'"></span>
   </div>
 
   <div class="table-wrap">
-    <div class="loading" x-show="loading">Загружаем данные...</div>
+    <div class="loading" x-show="loading">Loading data...</div>
     <div class="empty" x-show="!loading && (!data.players || data.players.length === 0)">
-      Данных пока нет. Нажми «Обновить данные» чтобы собрать первый снапшот.
+      Данных пока нет. Нажми «Refresh data» чтобы собрать первый снапшот.
     </div>
     <table x-show="!loading && data.players && data.players.length > 0">
       <thead>
