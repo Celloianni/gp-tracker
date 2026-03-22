@@ -56,8 +56,12 @@
   .search:focus { border-color: #7c3aed; }
   .toolbar { display: flex; align-items: center; margin-bottom: 16px; }
   .dates { font-size: 13px; color: #64748b; margin-bottom: 20px; }
-  .month-select { background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 7px 12px; color: #e2e8f0; font-size: 13px; outline: none; cursor: pointer; margin-bottom: 20px; }
+  .month-select { background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 7px 12px; color: #e2e8f0; font-size: 13px; outline: none; cursor: pointer; }
   .month-select:focus { border-color: #7c3aed; }
+  .table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .table-title { font-size: 15px; font-weight: 500; color: #94a3b8; }
+  .guild-link { font-size: 12px; color: #7c3aed; text-decoration: none; border: 1px solid rgba(124,58,237,0.3); border-radius: 6px; padding: 4px 10px; transition: background 0.2s; }
+  .guild-link:hover { background: rgba(124,58,237,0.15); }
   .chart-wrap { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 24px; }
   .chart-title { font-size: 14px; font-weight: 500; color: #94a3b8; margin-bottom: 20px; }
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
@@ -126,14 +130,14 @@
         <div class="value" x-text="friendsTotalDiff()"></div>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;" x-show="friendsMonths.length">
-      <select class="month-select" x-model="friendsMonth" @change="loadFriends(true)">
+    <div class="table-header">
+      <div class="table-title" x-text="friendsMonth ? 'Growth for ' + formatMonth(friendsMonth) : 'Growth for ' + formatMonth(currentMonth())"></div>
+      <select class="month-select" x-model="friendsMonth" @change="loadFriends(true)" x-show="friendsMonths.length">
         <option value="">Current month</option>
         <template x-for="m in friendsMonths" :key="m">
           <option :value="m" x-text="formatMonth(m)"></option>
         </template>
       </select>
-      <span class="dates" x-show="friendsData.latest_date" x-text="friendsData.prev_date && friendsData.prev_date !== friendsData.latest_date ? friendsData.prev_date + ' → ' + friendsData.latest_date : 'Snapshot: ' + friendsData.latest_date"></span>
     </div>
     <div class="table-wrap">
       <div class="loading" x-show="loadingFriends">Loading data...</div>
@@ -185,14 +189,17 @@
         <div class="value" x-text="guildTotalDiff()"></div>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;" x-show="guildMonths.length">
-      <select class="month-select" x-model="guildMonth" @change="loadGuild(activeTab, true)">
+    <div class="table-header">
+      <div>
+        <div class="table-title" x-text="guildMonth ? 'Growth for ' + formatMonth(guildMonth) : 'Growth for ' + formatMonth(currentMonth())"></div>
+        <a :href="'https://swgoh.gg/g/' + activeTab + '/'" target="_blank" class="guild-link" style="margin-top:6px;display:inline-block;">View on swgoh.gg ↗</a>
+      </div>
+      <select class="month-select" x-model="guildMonth" @change="loadGuild(activeTab, true)" x-show="guildMonths.length">
         <option value="">Current month</option>
         <template x-for="m in guildMonths" :key="m">
           <option :value="m" x-text="formatMonth(m)"></option>
         </template>
       </select>
-      <span class="dates" x-show="guildData.latest_date" x-text="guildData.prev_date && guildData.prev_date !== guildData.latest_date ? guildData.prev_date + ' → ' + guildData.latest_date : 'Snapshot: ' + guildData.latest_date"></span>
     </div>
     <div class="toolbar">
       <input class="search" type="text" placeholder="Search player..." x-model="search">
@@ -409,6 +416,10 @@ function tracker() {
     },
 
     fmt(n) { return Number(n).toLocaleString('en-US'); },
+    currentMonth() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    },
     formatMonth(m) {
       const [y, mo] = m.split('-');
       const d = new Date(y, mo - 1);
