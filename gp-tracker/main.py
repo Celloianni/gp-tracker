@@ -4,13 +4,28 @@ import asyncio
 from datetime import date
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
+SITE_PASSWORD = os.getenv("SITE_PASSWORD", "")
+
+security = HTTPBasic()
+
+def check_auth(credentials: HTTPBasicCredentials = Depends(security)):
+    correct = secrets.compare_digest(credentials.password.encode(), SITE_PASSWORD.encode())
+    if not correct:
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return True
 
 GUILDS = [
     {"id": "fJXYTxpsS9iZvGj2M1OUGw", "name": "CAW Patrol"},
@@ -134,24 +149,24 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
-async def index():
+async def index(auth: bool = Depends(check_auth)):
     return FileResponse("static/index.html")
 
 @app.get("/api/guilds")
-async def guilds():
+async def guilds(auth: bool = Depends(check_auth)):
     return [{"id": g["id"], "name": g["name"]} for g in GUILDS]
 
 @app.get("/api/progress/{guild_id:path}")
-async def progress(guild_id: str):
+async def progress(guild_id: str, auth: bool = Depends(check_auth)):
     return get_progress(guild_id)
 
 @app.get("/api/friends/history")
-async def friends_history():
+async def friends_history(auth: bool = Depends(check_auth)):
     friend_ids = [f["allyCode"] for f in FRIENDS]
     return get_friends_history(friend_ids)
 
 @app.post("/api/collect")
-async def collect(request: Request):
+async def collect(request: Request, auth: bool = Depends(check_auth)):
     body = await request.json()
     if body.get("password") != COLLECT_PASSWORD:
         raise HTTPException(status_code=401, detail="Wrong password")
