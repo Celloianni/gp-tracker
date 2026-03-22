@@ -56,6 +56,8 @@
   .search:focus { border-color: #7c3aed; }
   .toolbar { display: flex; align-items: center; margin-bottom: 16px; }
   .dates { font-size: 13px; color: #64748b; margin-bottom: 20px; }
+  .month-select { background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 7px 12px; color: #e2e8f0; font-size: 13px; outline: none; cursor: pointer; margin-bottom: 20px; }
+  .month-select:focus { border-color: #7c3aed; }
   .chart-wrap { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 24px; }
   .chart-title { font-size: 14px; font-weight: 500; color: #94a3b8; margin-bottom: 20px; }
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
@@ -124,8 +126,14 @@
         <div class="value" x-text="friendsTotalDiff()"></div>
       </div>
     </div>
-    <div class="dates" x-show="friendsData.latest_date">
-      <span x-text="friendsData.prev_date ? 'Period: ' + friendsData.prev_date + ' → ' + friendsData.latest_date : 'Snapshot: ' + friendsData.latest_date"></span>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;" x-show="friendsMonths.length">
+      <select class="month-select" x-model="friendsMonth" @change="loadFriends(true)">
+        <option value="">Current month</option>
+        <template x-for="m in friendsMonths" :key="m">
+          <option :value="m" x-text="formatMonth(m)"></option>
+        </template>
+      </select>
+      <span class="dates" x-show="friendsData.latest_date" x-text="friendsData.prev_date && friendsData.prev_date !== friendsData.latest_date ? friendsData.prev_date + ' → ' + friendsData.latest_date : 'Snapshot: ' + friendsData.latest_date"></span>
     </div>
     <div class="table-wrap">
       <div class="loading" x-show="loadingFriends">Loading data...</div>
@@ -177,8 +185,14 @@
         <div class="value" x-text="guildTotalDiff()"></div>
       </div>
     </div>
-    <div class="dates" x-show="guildData.latest_date">
-      <span x-text="guildData.prev_date ? 'Period: ' + guildData.prev_date + ' → ' + guildData.latest_date : 'Snapshot: ' + guildData.latest_date"></span>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;" x-show="guildMonths.length">
+      <select class="month-select" x-model="guildMonth" @change="loadGuild(activeTab, true)">
+        <option value="">Current month</option>
+        <template x-for="m in guildMonths" :key="m">
+          <option :value="m" x-text="formatMonth(m)"></option>
+        </template>
+      </select>
+      <span class="dates" x-show="guildData.latest_date" x-text="guildData.prev_date && guildData.prev_date !== guildData.latest_date ? guildData.prev_date + ' → ' + guildData.latest_date : 'Snapshot: ' + guildData.latest_date"></span>
     </div>
     <div class="toolbar">
       <input class="search" type="text" placeholder="Search player..." x-model="search">
@@ -236,6 +250,10 @@ function tracker() {
     sortDir: -1,
     friendsSortKey: 'diff',
     friendsSortDir: -1,
+    friendsMonth: '',
+    friendsMonths: [],
+    guildMonth: '',
+    guildMonths: [],
     showModal: false,
     password: '',
     wrongPassword: false,
@@ -258,8 +276,10 @@ function tracker() {
       this.activeTab = id;
       this.search = '';
       if (id === 'friends') {
+        this.friendsMonth = '';
         await this.loadFriends(true);
       } else {
+        this.guildMonth = '';
         await this.loadGuild(id, true);
       }
     },
@@ -389,6 +409,11 @@ function tracker() {
     },
 
     fmt(n) { return Number(n).toLocaleString('en-US'); },
+    formatMonth(m) {
+      const [y, mo] = m.split('-');
+      const d = new Date(y, mo - 1);
+      return d.toLocaleString('en-US', {month: 'long', year: 'numeric'});
+    },
     friendsTotalGP() { return this.fmt((this.friendsData.players||[]).reduce((s,p)=>s+p.gp,0)); },
     friendsTotalDiff() { const t=(this.friendsData.players||[]).reduce((s,p)=>s+p.diff,0); return (t>0?'+':'')+this.fmt(t); },
     guildTotalGP() { return this.fmt((this.guildData.players||[]).reduce((s,p)=>s+p.gp,0)); },
