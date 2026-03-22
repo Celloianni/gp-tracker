@@ -8,6 +8,7 @@ def get_conn():
 
 def init_db():
     with get_conn() as conn:
+        conn.execute("DROP TABLE IF EXISTS snapshots")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,3 +85,21 @@ def get_progress(guild_id: str):
             "players": players,
             "dates": dates
         }
+
+def get_friends_history(player_ids: list):
+    with get_conn() as conn:
+        placeholders = ",".join("?" * len(player_ids))
+        rows = conn.execute(f"""
+            SELECT snapshot_date, player_id, player_name, gp
+            FROM snapshots
+            WHERE guild_id = 'friends' AND player_id IN ({placeholders})
+            ORDER BY snapshot_date ASC
+        """, player_ids).fetchall()
+
+        players = {}
+        for snapshot_date, player_id, player_name, gp in rows:
+            if player_id not in players:
+                players[player_id] = {"name": player_name, "history": []}
+            players[player_id]["history"].append({"date": snapshot_date, "gp": gp})
+
+        return list(players.values())
