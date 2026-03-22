@@ -4,13 +4,14 @@ import asyncio
 from datetime import date
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from database import init_db, save_snapshot, get_progress
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 GUILD_ID = os.getenv("GUILD_ID", "fJXYTxpsS9iZvGj2M1OUGw")
+COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
 
 async def fetch_guild_gp():
     print(f"[{date.today()}] Начинаем сбор данных по гильдии...")
@@ -30,7 +31,6 @@ async def fetch_guild_gp():
             player_id = member.get("playerId")
             name = member.get("playerName") or member.get("name") or "Unknown"
             if not player_id:
-                print(f"  Пропускаем — нет playerId: {member}")
                 continue
             try:
                 pr = await client.post(f"{COMLINK_URL}/player", json={
@@ -86,8 +86,9 @@ async def progress():
     return data
 
 @app.post("/api/collect")
-async def collect():
-    asyncio.create_task(fetch_guild_gp())
-    return {"status": "started"}
+async def collect(request: Request):
+    body = await request.json()
+    if body.get("password") != COLLECT_PASSWORD:
+        raise HTTPException(status_code=401, detail="Неверный пароль")
     asyncio.create_task(fetch_guild_gp())
     return {"status": "started"}
