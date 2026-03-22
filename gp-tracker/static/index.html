@@ -59,7 +59,6 @@
 </head>
 <body x-data="tracker()" x-init="init()">
 
-<!-- Password modal -->
 <div class="modal-bg" x-show="showModal" @keydown.escape.window="showModal=false">
   <div class="modal">
     <h2>Refresh data</h2>
@@ -68,7 +67,7 @@
     <div class="modal-btns">
       <button class="btn-sm" @click="showModal=false; password=''; wrongPassword=false">Cancel</button>
       <button class="btn" @click="collect()" :disabled="collecting">
-        <span x-show="!collecting">Обновить</span>
+        <span x-show="!collecting">Refresh</span>
         <span class="collecting" x-show="collecting"><span class="spinner"></span> Collecting...</span>
       </button>
     </div>
@@ -88,15 +87,15 @@
 <div class="container">
   <div class="stats-row" x-show="data.players && data.players.length">
     <div class="stat-card">
-      <div class="label">Игроков в гильдии</div>
+      <div class="label">Guild members</div>
       <div class="value" x-text="data.players ? data.players.length : 0"></div>
     </div>
     <div class="stat-card">
-      <div class="label">Суммарный ГП</div>
+      <div class="label">Total GP</div>
       <div class="value" x-text="totalGP()"></div>
     </div>
     <div class="stat-card">
-      <div class="label">Прирост за период</div>
+      <div class="label">GP growth</div>
       <div class="value" x-text="totalDiff()"></div>
     </div>
   </div>
@@ -109,15 +108,15 @@
   <div class="table-wrap">
     <div class="loading" x-show="loading">Loading data...</div>
     <div class="empty" x-show="!loading && (!data.players || data.players.length === 0)">
-      Данных пока нет. Нажми «Refresh data» чтобы собрать первый снапшот.
+      No data yet. Click "Refresh data" to collect the first snapshot.
     </div>
     <table x-show="!loading && data.players && data.players.length > 0">
       <thead>
         <tr>
           <th @click="sort('rank')">#</th>
-          <th @click="sort('name')">Игрок</th>
-          <th @click="sort('gp')">ГП сейчас</th>
-          <th @click="sort('diff')">Прирост ГП</th>
+          <th @click="sort('name')">Player</th>
+          <th @click="sort('gp')">GP now</th>
+          <th @click="sort('diff')">GP growth</th>
           <th @click="sort('diff_pct')">%</th>
         </tr>
       </thead>
@@ -206,7 +205,7 @@ function tracker() {
     },
 
     fmt(n) {
-      return Number(n).toLocaleString('ru-RU');
+      return Number(n).toLocaleString('en-US');
     },
 
     totalGP() {
