@@ -231,27 +231,26 @@ function tracker() {
       const r = await fetch('/api/guilds');
       this.guilds = await r.json();
       await this.loadFriends();
-      setInterval(() => this.autoRefresh(), 30000);
+
     },
 
     async autoRefresh() {
-      if (this.activeTab === 'friends') await this.loadFriends();
-      else await this.loadGuild(this.activeTab);
+      if (this.activeTab === 'friends') await this.loadFriends(false);
+      else await this.loadGuild(this.activeTab, false);
     },
 
     async switchTab(id) {
       this.activeTab = id;
       this.search = '';
       if (id === 'friends') {
-        await this.loadFriends();
+        await this.loadFriends(true);
       } else {
-        this.loadingGuild = true;
-        await this.loadGuild(id);
+        await this.loadGuild(id, true);
       }
     },
 
-    async loadFriends() {
-      this.loadingFriends = true;
+    async loadFriends(showLoading = true) {
+      if (showLoading) this.loadingFriends = true;
       try {
         const [prog, hist] = await Promise.all([
           fetch('/api/progress/friends').then(r => r.json()),
@@ -261,15 +260,16 @@ function tracker() {
         this.friendsHistory = hist;
         this.$nextTick(() => this.renderChart());
       } catch(e) { console.error(e); }
-      finally { this.loadingFriends = false; }
+      finally { if (showLoading) this.loadingFriends = false; }
     },
 
-    async loadGuild(id) {
+    async loadGuild(id, showLoading = true) {
+      if (showLoading) this.loadingGuild = true;
       try {
         const r = await fetch(`/api/progress/${id}`);
         this.guildData = await r.json();
       } catch(e) { console.error(e); }
-      finally { this.loadingGuild = false; }
+      finally { if (showLoading) this.loadingGuild = false; }
     },
 
     renderChart() {
