@@ -8,9 +8,12 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
-  .header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
+  .header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
   .header h1 { font-size: 20px; font-weight: 600; color: #a78bfa; }
-  .header .dates { font-size: 13px; color: #64748b; }
+  .tabs { display: flex; gap: 4px; padding: 0 32px; background: #1a1d2e; border-bottom: 1px solid #2d3148; overflow-x: auto; }
+  .tab { padding: 12px 18px; font-size: 13px; font-weight: 500; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.2s; }
+  .tab:hover { color: #a78bfa; }
+  .tab.active { color: #a78bfa; border-bottom-color: #7c3aed; }
   .container { max-width: 960px; margin: 0 auto; padding: 28px 20px; }
   .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
   .stat-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 18px 20px; }
@@ -48,6 +51,7 @@
   .search { background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 8px 14px; color: #e2e8f0; font-size: 14px; width: 220px; outline: none; margin-right: 12px; }
   .search:focus { border-color: #7c3aed; }
   .toolbar { display: flex; align-items: center; margin-bottom: 16px; }
+  .dates { font-size: 13px; color: #64748b; margin-bottom: 20px; }
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
   .modal { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 16px; padding: 28px; width: 340px; }
   .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #e2e8f0; }
@@ -76,12 +80,13 @@
 
 <div class="header">
   <h1>GP Tracker</h1>
-  <div style="display:flex;align-items:center;gap:16px;">
-    <div class="dates" x-show="data.latest_date">
-      <span x-text="data.prev_date ? data.prev_date + ' → ' + data.latest_date : data.latest_date"></span>
-    </div>
-    <button class="btn" @click="showModal=true; wrongPassword=false">Refresh data</button>
-  </div>
+  <button class="btn" @click="showModal=true; wrongPassword=false">Refresh data</button>
+</div>
+
+<div class="tabs">
+  <template x-for="g in guilds" :key="g.id">
+    <div class="tab" :class="activeGuild === g.id ? 'active' : ''" @click="switchGuild(g.id)" x-text="g.name"></div>
+  </template>
 </div>
 
 <div class="container">
@@ -98,6 +103,10 @@
       <div class="label">GP growth</div>
       <div class="value" x-text="totalDiff()"></div>
     </div>
+  </div>
+
+  <div class="dates" x-show="data.latest_date">
+    <span x-text="data.prev_date ? 'Period: ' + data.prev_date + ' → ' + data.latest_date : 'Snapshot: ' + data.latest_date"></span>
   </div>
 
   <div class="toolbar">
@@ -138,6 +147,8 @@
 <script>
 function tracker() {
   return {
+    guilds: [],
+    activeGuild: null,
     data: {},
     loading: true,
     collecting: false,
@@ -149,13 +160,28 @@ function tracker() {
     wrongPassword: false,
 
     async init() {
-      await this.load();
+      const r = await fetch('/api/guilds');
+      this.guilds = await r.json();
+      if (this.guilds.length > 0) {
+        this.activeGuild = this.guilds[0].id;
+        await this.load();
+      }
       setInterval(() => this.load(), 30000);
     },
 
+    async switchGuild(id) {
+      this.activeGuild = id;
+      this.loading = true;
+      this.search = '';
+      this.sortKey = 'diff';
+      this.sortDir = -1;
+      await this.load();
+    },
+
     async load() {
+      if (!this.activeGuild) return;
       try {
-        const r = await fetch('/api/progress');
+        const r = await fetch(`/api/progress/${this.activeGuild}`);
         this.data = await r.json();
       } catch(e) {
         console.error(e);
@@ -180,7 +206,7 @@ function tracker() {
         }
         this.showModal = false;
         this.password = '';
-        await new Promise(r => setTimeout(r, 8000));
+        await new Promise(r => setTimeout(r, 15000));
         await this.load();
       } catch(e) {
         console.error(e);
