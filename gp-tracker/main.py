@@ -5,7 +5,7 @@ from datetime import date
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -184,7 +184,10 @@ async def login(request: Request):
     return response
 
 @app.get("/")
-async def index(auth: bool = Depends(check_auth)):
+async def index(request: Request):
+    token = request.cookies.get("auth_token", "")
+    if not SITE_PASSWORD or not secrets.compare_digest(token, SITE_PASSWORD):
+        return RedirectResponse(url="/login")
     return FileResponse("static/index.html")
 
 @app.get("/api/guilds")
