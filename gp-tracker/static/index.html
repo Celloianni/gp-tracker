@@ -19,6 +19,8 @@
   .btn { background: #7c3aed; color: white; border: none; padding: 8px 18px; border-radius: 8px; font-size: 13px; cursor: pointer; transition: background 0.2s; }
   .btn:hover { background: #6d28d9; }
   .btn:disabled { background: #3d2d6e; color: #9ca3af; cursor: not-allowed; }
+  .btn-sm { background: transparent; border: 1px solid #2d3148; color: #94a3b8; padding: 6px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  .btn-sm:hover { border-color: #7c3aed; color: #a78bfa; }
   .table-wrap { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; overflow: hidden; }
   table { width: 100%; border-collapse: collapse; }
   thead { background: #141625; }
@@ -46,9 +48,32 @@
   .search { background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 8px 14px; color: #e2e8f0; font-size: 14px; width: 220px; outline: none; margin-right: 12px; }
   .search:focus { border-color: #7c3aed; }
   .toolbar { display: flex; align-items: center; margin-bottom: 16px; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 16px; padding: 28px; width: 340px; }
+  .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #e2e8f0; }
+  .modal input { width: 100%; background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 10px 14px; color: #e2e8f0; font-size: 14px; outline: none; margin-bottom: 12px; }
+  .modal input:focus { border-color: #7c3aed; }
+  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .error-msg { font-size: 13px; color: #f87171; margin-bottom: 10px; }
 </style>
 </head>
 <body x-data="tracker()" x-init="init()">
+
+<!-- Password modal -->
+<div class="modal-bg" x-show="showModal" @keydown.escape.window="showModal=false">
+  <div class="modal">
+    <h2>Обновить данные</h2>
+    <input type="password" placeholder="Введите пароль" x-model="password" @keydown.enter="collect()" autofocus>
+    <div class="error-msg" x-show="wrongPassword">Неверный пароль</div>
+    <div class="modal-btns">
+      <button class="btn-sm" @click="showModal=false; password=''; wrongPassword=false">Отмена</button>
+      <button class="btn" @click="collect()" :disabled="collecting">
+        <span x-show="!collecting">Обновить</span>
+        <span class="collecting" x-show="collecting"><span class="spinner"></span> Собираем...</span>
+      </button>
+    </div>
+  </div>
+</div>
 
 <div class="header">
   <h1>GP Tracker</h1>
@@ -56,17 +81,11 @@
     <div class="dates" x-show="data.latest_date">
       <span x-text="data.prev_date ? data.prev_date + ' → ' + data.latest_date : data.latest_date"></span>
     </div>
-    <button class="btn" @click="collect()" :disabled="collecting">
-      <span x-show="!collecting">Обновить данные</span>
-      <span class="collecting" x-show="collecting">
-        <span class="spinner"></span> Собираем...
-      </span>
-    </button>
+    <button class="btn" @click="showModal=true; wrongPassword=false">Обновить данные</button>
   </div>
 </div>
 
 <div class="container">
-
   <div class="stats-row" x-show="data.players && data.players.length">
     <div class="stat-card">
       <div class="label">Игроков в гильдии</div>
@@ -115,7 +134,6 @@
       </tbody>
     </table>
   </div>
-
 </div>
 
 <script>
@@ -127,6 +145,9 @@ function tracker() {
     search: '',
     sortKey: 'diff',
     sortDir: -1,
+    showModal: false,
+    password: '',
+    wrongPassword: false,
 
     async init() {
       await this.load();
@@ -146,10 +167,27 @@ function tracker() {
 
     async collect() {
       this.collecting = true;
-      await fetch('/api/collect', { method: 'POST' });
-      await new Promise(r => setTimeout(r, 5000));
-      await this.load();
-      this.collecting = false;
+      this.wrongPassword = false;
+      try {
+        const r = await fetch('/api/collect', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({password: this.password})
+        });
+        if (r.status === 401) {
+          this.wrongPassword = true;
+          this.collecting = false;
+          return;
+        }
+        this.showModal = false;
+        this.password = '';
+        await new Promise(r => setTimeout(r, 8000));
+        await this.load();
+      } catch(e) {
+        console.error(e);
+      } finally {
+        this.collecting = false;
+      }
     },
 
     filtered() {
