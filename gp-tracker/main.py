@@ -15,11 +15,14 @@ COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
 SITE_PASSWORD = os.getenv("SITE_PASSWORD", "")
 
-def check_auth(request: Request):
-    token = request.cookies.get("auth_token", "")
-    if not secrets.compare_digest(token, SITE_PASSWORD):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return True
+class AuthChecker:
+    async def __call__(self, request: Request):
+        token = request.cookies.get("auth_token", "")
+        if not SITE_PASSWORD or not secrets.compare_digest(token, SITE_PASSWORD):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        return True
+
+check_auth = AuthChecker()
 
 GUILDS = [
     {"id": "fJXYTxpsS9iZvGj2M1OUGw", "name": "CAW Patrol"},
