@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GP Tracker — Прогресс гильдии</title>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+  .header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 20px; font-weight: 600; color: #a78bfa; }
+  .header .dates { font-size: 13px; color: #64748b; }
+  .container { max-width: 960px; margin: 0 auto; padding: 28px 20px; }
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 18px 20px; }
+  .stat-card .label { font-size: 12px; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-card .value { font-size: 24px; font-weight: 700; color: #e2e8f0; }
+  .btn { background: #7c3aed; color: white; border: none; padding: 8px 18px; border-radius: 8px; font-size: 13px; cursor: pointer; transition: background 0.2s; }
+  .btn:hover { background: #6d28d9; }
+  .btn:disabled { background: #3d2d6e; color: #9ca3af; cursor: not-allowed; }
+  .table-wrap { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: #141625; }
+  th { padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; user-select: none; }
+  th:hover { color: #a78bfa; }
+  td { padding: 13px 16px; font-size: 14px; border-top: 1px solid #1e2235; }
+  tr:hover td { background: #1e2235; }
+  .rank { color: #64748b; font-size: 13px; width: 36px; }
+  .rank.top1 { color: #fbbf24; font-weight: 700; }
+  .rank.top2 { color: #94a3b8; font-weight: 700; }
+  .rank.top3 { color: #b45309; font-weight: 700; }
+  .name { font-weight: 500; color: #e2e8f0; }
+  .gp { font-variant-numeric: tabular-nums; color: #cbd5e1; }
+  .diff { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .diff.pos { color: #34d399; }
+  .diff.neg { color: #f87171; }
+  .diff.zero { color: #64748b; }
+  .pct { font-size: 12px; color: #64748b; }
+  .pct.pos { color: #6ee7b7; }
+  .loading { text-align: center; padding: 60px; color: #64748b; }
+  .empty { text-align: center; padding: 60px; color: #64748b; }
+  .collecting { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #a78bfa; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 14px; height: 14px; border: 2px solid #3d2d6e; border-top-color: #a78bfa; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .search { background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 8px 14px; color: #e2e8f0; font-size: 14px; width: 220px; outline: none; margin-right: 12px; }
+  .search:focus { border-color: #7c3aed; }
+  .toolbar { display: flex; align-items: center; margin-bottom: 16px; }
+</style>
+</head>
+<body x-data="tracker()" x-init="init()">
+
+<div class="header">
+  <h1>GP Tracker</h1>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div class="dates" x-show="data.latest_date">
+      <span x-text="data.prev_date ? data.prev_date + ' → ' + data.latest_date : data.latest_date"></span>
+    </div>
+    <button class="btn" @click="collect()" :disabled="collecting">
+      <span x-show="!collecting">Обновить данные</span>
+      <span class="collecting" x-show="collecting">
+        <span class="spinner"></span> Собираем...
+      </span>
+    </button>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="stats-row" x-show="data.players && data.players.length">
+    <div class="stat-card">
+      <div class="label">Игроков в гильдии</div>
+      <div class="value" x-text="data.players ? data.players.length : 0"></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Суммарный ГП</div>
+      <div class="value" x-text="totalGP()"></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Прирост за период</div>
+      <div class="value" x-text="totalDiff()"></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <input class="search" type="text" placeholder="Поиск игрока..." x-model="search">
+    <span style="font-size:13px;color:#64748b;" x-text="filtered().length + ' игроков'"></span>
+  </div>
+
+  <div class="table-wrap">
+    <div class="loading" x-show="loading">Загружаем данные...</div>
+    <div class="empty" x-show="!loading && (!data.players || data.players.length === 0)">
+      Данных пока нет. Нажми «Обновить данные» чтобы собрать первый снапшот.
+    </div>
+    <table x-show="!loading && data.players && data.players.length > 0">
+      <thead>
+        <tr>
+          <th @click="sort('rank')">#</th>
+          <th @click="sort('name')">Игрок</th>
+          <th @click="sort('gp')">ГП сейчас</th>
+          <th @click="sort('diff')">Прирост ГП</th>
+          <th @click="sort('diff_pct')">%</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="(p, i) in filtered()" :key="p.name">
+          <tr>
+            <td class="rank" :class="i===0?'top1':i===1?'top2':i===2?'top3':''" x-text="i+1"></td>
+            <td class="name" x-text="p.name"></td>
+            <td class="gp" x-text="fmt(p.gp)"></td>
+            <td class="diff" :class="p.diff>0?'pos':p.diff<0?'neg':'zero'" x-text="(p.diff>0?'+':'')+fmt(p.diff)"></td>
+            <td class="pct" :class="p.diff_pct>0?'pos':''" x-text="(p.diff_pct>0?'+':'')+p.diff_pct+'%'"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+function tracker() {
+  return {
+    data: {},
+    loading: true,
+    collecting: false,
+    search: '',
+    sortKey: 'diff',
+    sortDir: -1,
+
+    async init() {
+      await this.load();
+      setInterval(() => this.load(), 30000);
+    },
+
+    async load() {
+      try {
+        const r = await fetch('/api/progress');
+        this.data = await r.json();
+      } catch(e) {
+        console.error(e);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async collect() {
+      this.collecting = true;
+      await fetch('/api/collect', { method: 'POST' });
+      await new Promise(r => setTimeout(r, 5000));
+      await this.load();
+      this.collecting = false;
+    },
+
+    filtered() {
+      let players = this.data.players || [];
+      if (this.search) {
+        players = players.filter(p => p.name.toLowerCase().includes(this.search.toLowerCase()));
+      }
+      return [...players].sort((a, b) => {
+        return this.sortDir * (a[this.sortKey] > b[this.sortKey] ? 1 : -1);
+      });
+    },
+
+    sort(key) {
+      if (this.sortKey === key) this.sortDir *= -1;
+      else { this.sortKey = key; this.sortDir = -1; }
+    },
+
+    fmt(n) {
+      return Number(n).toLocaleString('ru-RU');
+    },
+
+    totalGP() {
+      const total = (this.data.players || []).reduce((s, p) => s + p.gp, 0);
+      return this.fmt(total);
+    },
+
+    totalDiff() {
+      const total = (this.data.players || []).reduce((s, p) => s + p.diff, 0);
+      return (total > 0 ? '+' : '') + this.fmt(total);
+    }
+  }
+}
+</script>
+</body>
+</html>
