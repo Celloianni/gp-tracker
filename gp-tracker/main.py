@@ -15,7 +15,6 @@ GUILD_ID = os.getenv("GUILD_ID", "fJXYTxpsS9iZvGj2M1OUGw")
 async def fetch_guild_gp():
     print(f"[{date.today()}] Начинаем сбор данных по гильдии...")
     async with httpx.AsyncClient(timeout=120) as client:
-        # Получаем список игроков гильдии
         r = await client.post(f"{COMLINK_URL}/guild", json={
             "payload": {"guildId": GUILD_ID},
             "enums": False
@@ -27,7 +26,7 @@ async def fetch_guild_gp():
         print(f"Найдено игроков: {len(members)}")
 
         players = []
-                for member in members:
+        for member in members:
             player_id = member.get("playerId")
             name = member.get("playerName") or member.get("name") or "Unknown"
             if not player_id:
@@ -67,7 +66,6 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(fetch_guild_gp, "cron", hour=6, minute=0)
     scheduler.start()
     print("Планировщик запущен. Сбор данных каждый день в 06:00.")
-    # Собираем данные сразу при старте если база пустая
     from database import is_empty
     if is_empty():
         print("База пустая — собираем данные сейчас...")
@@ -89,5 +87,7 @@ async def progress():
 
 @app.post("/api/collect")
 async def collect():
+    asyncio.create_task(fetch_guild_gp())
+    return {"status": "started"}
     asyncio.create_task(fetch_guild_gp())
     return {"status": "started"}
