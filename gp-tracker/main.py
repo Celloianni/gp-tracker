@@ -74,8 +74,7 @@ async def fetch_friends():
     global collection_status
     print(f"[{date.today()}] Collecting friends data...")
     collection_status["current"] = "Friends"
-    collection_status["done"] = 0
-    collection_status["total"] += len(FRIENDS)
+    collection_status["done"] = collection_status["done"]  # keep running total
     async with httpx.AsyncClient(timeout=60) as client:
         players = []
         for f in FRIENDS:
@@ -106,7 +105,7 @@ async def fetch_guild(client, guild):
         print(f"  Error fetching guild {guild_name}: {e}")
         return
 
-    collection_status["total"] += len(members)
+    # total already estimated at start
     players = []
     for member in members:
         player_id = member.get("playerId")
@@ -139,9 +138,11 @@ async def fetch_guild(client, guild):
 
 async def fetch_all():
     global collection_status
+    # Estimate total: 6 friends + 6 guilds x ~50 players
+    estimated_total = len(FRIENDS) + len(GUILDS) * 50
     collection_status["running"] = True
     collection_status["done"] = 0
-    collection_status["total"] = 0
+    collection_status["total"] = estimated_total
     collection_status["current"] = ""
     print(f"[{date.today()}] Starting full data collection...")
     await fetch_friends()
@@ -150,6 +151,7 @@ async def fetch_all():
             await fetch_guild(client, guild)
     collection_status["running"] = False
     collection_status["current"] = "Done"
+    collection_status["done"] = collection_status["total"]
     print("Collection complete.")
 
 scheduler = AsyncIOScheduler()
