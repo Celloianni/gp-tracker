@@ -27,7 +27,8 @@
   .btn:disabled { background: #3d2d6e; color: #9ca3af; cursor: not-allowed; }
   .btn-sm { background: transparent; border: 1px solid #2d3148; color: #94a3b8; padding: 6px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; }
   .btn-sm:hover { border-color: #7c3aed; color: #a78bfa; }
-  .table-wrap { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+  .table-wrap { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; overflow-x: auto; margin-bottom: 24px; }
+  table { min-width: 560px; }
   table { width: 100%; border-collapse: collapse; }
   thead { background: #141625; }
   th { padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; user-select: none; }
@@ -64,6 +65,10 @@
   .modal input:focus { border-color: #7c3aed; }
   .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
   .error-msg { font-size: 13px; color: #f87171; margin-bottom: 10px; }
+  .progress-bar-wrap { margin-top: 14px; }
+  .progress-bar-label { font-size: 12px; color: #94a3b8; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .progress-bar-bg { background: #141625; border-radius: 6px; height: 6px; overflow: hidden; }
+  .progress-bar-fill { height: 6px; border-radius: 6px; background: #7c3aed; transition: width 1s linear; }
 </style>
 </head>
 <body x-data="tracker()" x-init="init()">
@@ -73,6 +78,15 @@
     <h2>Refresh data</h2>
     <input type="password" placeholder="Enter password" x-model="password" @keydown.enter="collect()" autofocus>
     <div class="error-msg" x-show="wrongPassword">Wrong password</div>
+    <div class="progress-bar-wrap" x-show="collecting">
+      <div class="progress-bar-label">
+        <span x-text="progressLabel"></span>
+        <span x-text="progressPct + '%'"></span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" :style="'width:' + progressPct + '%'"></div>
+      </div>
+    </div>
     <div class="modal-btns">
       <button class="btn-sm" @click="showModal=false; password=''; wrongPassword=false">Cancel</button>
       <button class="btn" @click="collect()" :disabled="collecting">
@@ -228,6 +242,8 @@ function tracker() {
     showModal: false,
     password: '',
     wrongPassword: false,
+    progressPct: 0,
+    progressLabel: 'Starting...',
 
     async init() {
       const r = await fetch('/api/guilds');
@@ -254,10 +270,12 @@ function tracker() {
     async loadFriends(showLoading = true) {
       if (showLoading) this.loadingFriends = true;
       try {
-        const [prog, hist] = await Promise.all([
-          fetch('/api/progress/friends').then(r => r.json()),
-          fetch('/api/friends/history').then(r => r.json())
+        const [progR, histR] = await Promise.all([
+          fetch('/api/progress/friends'),
+          fetch('/api/friends/history')
         ]);
+        if (progR.status === 401) { window.location.href = '/login'; return; }
+        const [prog, hist] = await Promise.all([progR.json(), histR.json()]);
         this.friendsData = prog;
         this.friendsHistory = hist;
         this.$nextTick(() => this.renderChart());
@@ -269,6 +287,7 @@ function tracker() {
       if (showLoading) this.loadingGuild = true;
       try {
         const r = await fetch(`/api/progress/${id}`);
+        if (r.status === 401) { window.location.href = '/login'; return; }
         this.guildData = await r.json();
       } catch(e) { console.error(e); }
       finally { if (showLoading) this.loadingGuild = false; }
@@ -319,6 +338,8 @@ function tracker() {
     async collect() {
       this.collecting = true;
       this.wrongPassword = false;
+      this.progressPct = 0;
+      this.progressLabel = 'Starting...';
       try {
         const r = await fetch('/api/collect', {
           method: 'POST',
@@ -326,12 +347,27 @@ function tracker() {
           body: JSON.stringify({password: this.password})
         });
         if (r.status === 401) { this.wrongPassword = true; this.collecting = false; return; }
-        this.showModal = false;
         this.password = '';
-        await new Promise(r => setTimeout(r, 20000));
+        await new Promise(resolve => {
+          const poll = setInterval(async () => {
+            try {
+              const s = await fetch('/api/status').then(r => r.json());
+              this.progressPct = s.pct;
+              this.progressLabel = s.current ? `${s.current} (${s.done}/${s.total})` : 'Starting...';
+              if (!s.running && s.current === 'Done') {
+                clearInterval(poll);
+                resolve();
+              }
+            } catch(e) {}
+          }, 2000);
+        });
+        this.progressPct = 100;
+        this.progressLabel = 'Done!';
+        await new Promise(r => setTimeout(r, 800));
+        this.showModal = false;
         await this.autoRefresh();
       } catch(e) { console.error(e); }
-      finally { this.collecting = false; }
+      finally { this.collecting = false; this.progressPct = 0; }
     },
 
     friendsSorted() {
