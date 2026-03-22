@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import date, timedelta
 
-DB_PATH = "gp_tracker.db"
+DB_PATH = "/data/gp_tracker.db"
 
 def get_conn():
     return sqlite3.connect(DB_PATH)
