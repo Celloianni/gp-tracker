@@ -5,7 +5,7 @@ from datetime import date
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse as FastAPIFileResponse
 import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -13,6 +13,7 @@ from database import init_db, save_snapshot, get_progress, is_empty, get_friends
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
+DB_PATH = "/data/gp_tracker.db"
 SITE_PASSWORD = os.getenv("SITE_PASSWORD", "")
 
 class AuthChecker:
@@ -159,9 +160,9 @@ scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    scheduler.add_job(fetch_all, "cron", hour=4, minute=0)
+    scheduler.add_job(fetch_all, "cron", hour=6, minute=0)
     scheduler.start()
-    print("Scheduler started. Data collection every day at 04:00.")
+    print("Scheduler started. Data collection every day at 06:00.")
     if is_empty():
         print("Database empty — collecting now...")
         asyncio.create_task(fetch_all())
@@ -222,6 +223,15 @@ async def status(auth: bool = Depends(check_auth)):
         "total": s["total"],
         "pct": pct,
     }
+
+@app.get("/api/backup")
+async def backup(request: Request):
+    token = request.cookies.get("auth_token", "")
+    if not SITE_PASSWORD or not secrets.compare_digest(token, SITE_PASSWORD):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    from datetime import date
+    filename = f"gp_tracker_backup_{date.today()}.db"
+    return FastAPIFileResponse(DB_PATH, filename=filename, media_type="application/octet-stream")
 
 @app.post("/api/collect")
 async def collect(request: Request, auth: bool = Depends(check_auth)):
