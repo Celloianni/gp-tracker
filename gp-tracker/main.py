@@ -159,9 +159,9 @@ scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    scheduler.add_job(fetch_all, "cron", hour=6, minute=0)
+    scheduler.add_job(fetch_all, "cron", hour=4, minute=0)
     scheduler.start()
-    print("Scheduler started. Data collection every day at 06:00.")
+    print("Scheduler started. Data collection every day at 04:00.")
     if is_empty():
         print("Database empty — collecting now...")
         asyncio.create_task(fetch_all())
