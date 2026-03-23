@@ -176,7 +176,7 @@
                 </div>
               </td>
               <td style="width:20px;padding-right:0;">
-                <span class="activity-dot" :style="'background:'+activityColor(p.streak)"></span>
+                <span class="activity-dot" :style="'background:'+activityColor(p.activity)"></span>
               </td>
               <td class="name" x-text="p.name"></td>
               <td class="gp" x-text="fmt(p.gp)"></td>
@@ -251,7 +251,7 @@
                 </div>
               </td>
               <td style="width:20px;padding-right:0;">
-                <span class="activity-dot" :style="'background:'+activityColor(p.streak)"></span>
+                <span class="activity-dot" :style="'background:'+activityColor(p.activity)"></span>
               </td>
               <td class="name" x-text="p.name"></td>
               <td class="gp" x-text="fmt(p.gp)"></td>
@@ -445,24 +445,21 @@ function tracker() {
     },
 
     fmt(n) { return Number(n).toLocaleString('en-US'); },
-    activityColor(streak) {
-      // 10 gradations: -15 to +15 days maps to red to green
-      // Each 3 days = 1 step, 10 steps total
-      const step = Math.max(-5, Math.min(5, Math.round(streak / 3)));
+    activityColor(level) {
       const colors = [
-        '#7f1d1d', // -5: deep red
-        '#ef4444', // -4
-        '#f97316', // -3
-        '#f59e0b', // -2
-        '#eab308', // -1
-        '#ef4444', // 0: starts red (unproven)
-        '#4ade80', // +1
-        '#22c55e', // +2
-        '#16a34a', // +3
-        '#15803d', // +4
-        '#166534', // +5: deep green
+        '#dc2626', // 1: red (0-10k)
+        '#ea580c', // 2
+        '#f97316', // 3
+        '#fb923c', // 4
+        '#fbbf24', // 5: yellow (40-50k)
+        '#d4b800', // 6: yellowish
+        '#a3c400', // 7
+        '#65b800', // 8
+        '#16a34a', // 9
+        '#00e052', // 10: bright green (90k+)
       ];
-      return colors[step + 5];
+      const idx = Math.min(10, Math.max(1, level || 1)) - 1;
+      return colors[idx];
     },
     currentMonth() {
       const d = new Date();
