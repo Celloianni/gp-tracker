@@ -61,12 +61,14 @@ def get_progress(guild_id: str):
                 (guild_id, prev_date)
             ).fetchall()}
 
-        players = []
+        # Build players with GP rank
+        players_raw = []
         for pid, data in latest.items():
             gp_now = data["gp"]
             gp_prev = prev.get(pid, gp_now)
             diff = gp_now - gp_prev
-            players.append({
+            players_raw.append({
+                "id": pid,
                 "name": data["name"],
                 "gp": gp_now,
                 "gp_prev": gp_prev,
@@ -74,9 +76,28 @@ def get_progress(guild_id: str):
                 "diff_pct": round(diff / gp_prev * 100, 2) if gp_prev > 0 else 0
             })
 
+        # Sort by GP for rank assignment
+        players_raw.sort(key=lambda x: x["gp"], reverse=True)
+        gp_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
+
+        # Add streak and rank change
+        players = []
+        for p in players_raw:
+            streak = get_streak(guild_id, p["id"])
+            rank = gp_ranks[p["id"]]
+            rank_change = get_rank_change(guild_id, p["id"], rank)
+            players.append({
+                "name": p["name"],
+                "gp": p["gp"],
+                "gp_prev": p["gp_prev"],
+                "diff": p["diff"],
+                "diff_pct": p["diff_pct"],
+                "streak": streak,
+                "rank": rank,
+                "rank_change": rank_change,
+            })
+
         players.sort(key=lambda x: x["diff"], reverse=True)
-        for i, p in enumerate(players):
-            p["rank"] = i + 1
 
         return {
             "latest_date": latest_date,
@@ -124,12 +145,13 @@ def get_progress_for_month(guild_id: str, month: str):
                 (guild_id, first_date)
             ).fetchall()}
 
-        players = []
+        players_raw = []
         for pid, data in latest.items():
             gp_now = data["gp"]
             gp_prev = prev.get(pid, gp_now)
             diff = gp_now - gp_prev
-            players.append({
+            players_raw.append({
+                "id": pid,
                 "name": data["name"],
                 "gp": gp_now,
                 "gp_prev": gp_prev,
@@ -137,9 +159,26 @@ def get_progress_for_month(guild_id: str, month: str):
                 "diff_pct": round(diff / gp_prev * 100, 2) if gp_prev > 0 else 0
             })
 
+        players_raw.sort(key=lambda x: x["gp"], reverse=True)
+        gp_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
+
+        players = []
+        for p in players_raw:
+            streak = get_streak(guild_id, p["id"])
+            rank = gp_ranks[p["id"]]
+            rank_change = get_rank_change(guild_id, p["id"], rank)
+            players.append({
+                "name": p["name"],
+                "gp": p["gp"],
+                "gp_prev": p["gp_prev"],
+                "diff": p["diff"],
+                "diff_pct": p["diff_pct"],
+                "streak": streak,
+                "rank": rank,
+                "rank_change": rank_change,
+            })
+
         players.sort(key=lambda x: x["diff"], reverse=True)
-        for i, p in enumerate(players):
-            p["rank"] = i + 1
 
         return {
             "latest_date": last_date,
@@ -147,6 +186,62 @@ def get_progress_for_month(guild_id: str, month: str):
             "players": players,
             "dates": [first_date, last_date]
         }
+
+def get_streak(guild_id: str, player_id: str):
+    """Count consecutive days of positive/negative GP growth."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT snapshot_date, gp FROM snapshots
+            WHERE guild_id = ? AND player_id = ?
+            ORDER BY snapshot_date DESC LIMIT 60
+        """, (guild_id, player_id)).fetchall()
+
+    if len(rows) < 2:
+        return 0
+
+    # Calculate daily diffs
+    diffs = []
+    for i in range(len(rows) - 1):
+        diffs.append(rows[i][1] - rows[i+1][1])
+
+    if not diffs:
+        return 0
+
+    # Count consecutive same-sign days from most recent
+    first_positive = diffs[0] > 0
+    streak = 0
+    for d in diffs:
+        if (d > 0) == first_positive:
+            streak += 1
+        else:
+            break
+
+    return streak if first_positive else -streak
+
+def get_rank_change(guild_id: str, player_id: str, current_rank: int):
+    """Compare rank vs previous snapshot."""
+    with get_conn() as conn:
+        dates = [r[0] for r in conn.execute("""
+            SELECT DISTINCT snapshot_date FROM snapshots
+            WHERE guild_id = ? ORDER BY snapshot_date DESC LIMIT 2
+        """, (guild_id,)).fetchall()]
+
+    if len(dates) < 2:
+        return 0
+
+    prev_date = dates[1]
+    with get_conn() as conn:
+        all_prev = conn.execute("""
+            SELECT player_id, gp FROM snapshots
+            WHERE guild_id = ? AND snapshot_date = ?
+            ORDER BY gp DESC
+        """, (guild_id, prev_date)).fetchall()
+
+    prev_rank_map = {r[0]: i+1 for i, r in enumerate(all_prev)}
+    prev_rank = prev_rank_map.get(player_id)
+    if prev_rank is None:
+        return 0
+    return prev_rank - current_rank  # positive = moved up
 
 def get_friends_history(player_ids: list):
     with get_conn() as conn:
