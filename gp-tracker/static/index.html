@@ -190,6 +190,25 @@
         </tbody>
       </table>
     </div>
+    <div x-show="friendsData.players && friendsData.players.length > 0" style="margin-top:28px;">
+      <div style="font-size:15px;font-weight:500;color:#94a3b8;margin-bottom:20px;">Who's got the longest... 👀</div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <template x-for="p in friendsChart30()" :key="p.name">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:160px;font-size:13px;color:#e2e8f0;text-align:right;flex-shrink:0;" x-text="p.name"></div>
+            <div style="flex:1;position:relative;height:32px;">
+              <div style="position:absolute;left:0;top:0;height:100%;border-radius:0 16px 16px 0;display:flex;align-items:center;transition:width 0.8s ease;"
+                :style="'width:' + p.pct + '%;background:' + p.color + ';min-width:' + (p.growth > 0 ? '40px' : '4px') + ';'">
+                <span x-show="p.growth > 0" style="padding-left:12px;font-size:12px;font-weight:600;color:rgba(0,0,0,0.7);white-space:nowrap;" x-text="'+' + fmt(p.growth)"></span>
+              </div>
+              <span x-show="p.growth === 0" style="padding-left:10px;font-size:12px;color:#64748b;line-height:32px;">no growth</span>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div style="font-size:11px;color:#334155;margin-top:16px;text-align:right;">GP growth over last 30 days</div>
+    </div>
+
     <div class="chart-wrap" x-show="friendsHistory.length > 0">
       <div class="chart-title">GP growth over time</div>
       <canvas id="friendsChart" height="100"></canvas>
@@ -424,6 +443,43 @@ function tracker() {
         await this.autoRefresh();
       } catch(e) { console.error(e); }
       finally { this.collecting = false; this.progressPct = 0; }
+    },
+
+    friendsChart30() {
+      const players = this.friendsData.players || [];
+      if (!players.length) return [];
+
+      // Calculate 30-day growth from history
+      const result = players.map(p => {
+        const hist = (this.friendsHistory || []).find(h => h.name === p.name);
+        let growth = 0;
+        if (hist && hist.history.length >= 2) {
+          const sorted = [...hist.history].sort((a, b) => a.date.localeCompare(b.date));
+          const latest = sorted[sorted.length - 1];
+          // Find closest to 30 days ago
+          const now = new Date(latest.date);
+          const target = new Date(now);
+          target.setDate(target.getDate() - 30);
+          const targetStr = target.toISOString().slice(0, 10);
+          const older = sorted.filter(h => h.date <= targetStr);
+          const base = older.length ? older[older.length - 1] : sorted[0];
+          growth = latest.gp - base.gp;
+        } else {
+          growth = p.diff || 0;
+        }
+        return { name: p.name, growth: Math.max(0, growth) };
+      });
+
+      const max = Math.max(...result.map(r => r.growth), 1);
+      const colors = ['#a78bfa','#f87171','#60a5fa','#34d399','#fbbf24','#f472b6'];
+
+      return result
+        .sort((a, b) => b.growth - a.growth)
+        .map((r, i) => ({
+          ...r,
+          pct: Math.max(r.growth > 0 ? 2 : 0.5, (r.growth / max) * 100),
+          color: colors[i % colors.length]
+        }));
     },
 
     friendsSorted() {
