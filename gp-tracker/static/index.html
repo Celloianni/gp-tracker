@@ -170,7 +170,7 @@
             <tr>
               <td class="rank" :class="i===0?'top1':i===1?'top2':i===2?'top3':''">
                 <div class="rank-cell">
-                  <span x-text="p.rank || i+1"></span>
+                  <span x-text="i+1"></span>
                   <span class="rank-change up" x-show="p.rank_change > 0" x-text="'↑'+p.rank_change"></span>
                   <span class="rank-change down" x-show="p.rank_change < 0" x-text="'↓'+Math.abs(p.rank_change)"></span>
                 </div>
@@ -245,7 +245,7 @@
             <tr>
               <td class="rank" :class="i===0?'top1':i===1?'top2':i===2?'top3':''">
                 <div class="rank-cell">
-                  <span x-text="p.rank || i+1"></span>
+                  <span x-text="i+1"></span>
                   <span class="rank-change up" x-show="p.rank_change > 0" x-text="'↑'+p.rank_change"></span>
                   <span class="rank-change down" x-show="p.rank_change < 0" x-text="'↓'+Math.abs(p.rank_change)"></span>
                 </div>
