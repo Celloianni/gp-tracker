@@ -63,6 +63,14 @@
   .table-title { font-size: 15px; font-weight: 500; color: #94a3b8; text-align: center; margin-bottom: 12px; }
   .guild-link { font-size: 12px; color: #7c3aed; text-decoration: none; border: 1px solid rgba(124,58,237,0.3); border-radius: 6px; padding: 4px 10px; transition: background 0.2s; }
   .guild-link:hover { background: rgba(124,58,237,0.15); }
+  .rank-cell { display: flex; align-items: baseline; gap: 4px; }
+  .rank-change { font-size: 10px; font-weight: 500; }
+  .rank-change.up { color: #34d399; }
+  .rank-change.down { color: #f87171; }
+  .activity-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .streak-pos { color: #34d399; font-size: 13px; }
+  .streak-neg { color: #f87171; font-size: 13px; }
+  .streak-zero { color: #64748b; font-size: 13px; }
   .chart-wrap { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 24px; }
   .chart-title { font-size: 14px; font-weight: 500; color: #94a3b8; margin-bottom: 20px; }
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
@@ -150,20 +158,30 @@
         <thead>
           <tr>
             <th @click="friendsSort('rank')">#</th>
+            <th></th>
             <th @click="friendsSort('name')">Player</th>
             <th @click="friendsSort('gp')">GP now</th>
             <th @click="friendsSort('diff')">GP growth</th>
-            <th @click="friendsSort('diff_pct')">%</th>
+            <th @click="friendsSort('streak')">Streak</th>
           </tr>
         </thead>
         <tbody>
           <template x-for="(p, i) in friendsSorted()" :key="p.name">
             <tr>
-              <td class="rank" :class="i===0?'top1':i===1?'top2':i===2?'top3':''" x-text="i+1"></td>
+              <td class="rank" :class="i===0?'top1':i===1?'top2':i===2?'top3':''">
+                <div class="rank-cell">
+                  <span x-text="p.rank || i+1"></span>
+                  <span class="rank-change up" x-show="p.rank_change > 0" x-text="'↑'+p.rank_change"></span>
+                  <span class="rank-change down" x-show="p.rank_change < 0" x-text="'↓'+Math.abs(p.rank_change)"></span>
+                </div>
+              </td>
+              <td style="width:20px;padding-right:0;">
+                <span class="activity-dot" :style="'background:'+activityColor(p.streak)"></span>
+              </td>
               <td class="name" x-text="p.name"></td>
               <td class="gp" x-text="fmt(p.gp)"></td>
               <td class="diff" :class="p.diff>0?'pos':p.diff<0?'neg':'zero'" x-text="(p.diff>0?'+':'')+fmt(p.diff)"></td>
-              <td class="pct" :class="p.diff_pct>0?'pos':''" x-text="(p.diff_pct>0?'+':'')+p.diff_pct+'%'"></td>
+              <td :class="p.streak>0?'streak-pos':p.streak<0?'streak-neg':'streak-zero'" x-text="p.streak>0?'+'+p.streak+' days':p.streak<0?p.streak+' days':'—'"></td>
             </tr>
           </template>
         </tbody>
@@ -215,20 +233,30 @@
         <thead>
           <tr>
             <th @click="sort('rank')">#</th>
+            <th></th>
             <th @click="sort('name')">Player</th>
             <th @click="sort('gp')">GP now</th>
             <th @click="sort('diff')">GP growth</th>
-            <th @click="sort('diff_pct')">%</th>
+            <th @click="sort('streak')">Streak</th>
           </tr>
         </thead>
         <tbody>
           <template x-for="(p, i) in guildFiltered()" :key="p.name">
             <tr>
-              <td class="rank" :class="i===0?'top1':i===1?'top2':i===2?'top3':''" x-text="i+1"></td>
+              <td class="rank" :class="i===0?'top1':i===1?'top2':i===2?'top3':''">
+                <div class="rank-cell">
+                  <span x-text="p.rank || i+1"></span>
+                  <span class="rank-change up" x-show="p.rank_change > 0" x-text="'↑'+p.rank_change"></span>
+                  <span class="rank-change down" x-show="p.rank_change < 0" x-text="'↓'+Math.abs(p.rank_change)"></span>
+                </div>
+              </td>
+              <td style="width:20px;padding-right:0;">
+                <span class="activity-dot" :style="'background:'+activityColor(p.streak)"></span>
+              </td>
               <td class="name" x-text="p.name"></td>
               <td class="gp" x-text="fmt(p.gp)"></td>
               <td class="diff" :class="p.diff>0?'pos':p.diff<0?'neg':'zero'" x-text="(p.diff>0?'+':'')+fmt(p.diff)"></td>
-              <td class="pct" :class="p.diff_pct>0?'pos':''" x-text="(p.diff_pct>0?'+':'')+p.diff_pct+'%'"></td>
+              <td :class="p.streak>0?'streak-pos':p.streak<0?'streak-neg':'streak-zero'" x-text="p.streak>0?'+'+p.streak+' days':p.streak<0?p.streak+' days':'—'"></td>
             </tr>
           </template>
         </tbody>
@@ -256,7 +284,7 @@ function tracker() {
     search: '',
     sortKey: 'diff',
     sortDir: -1,
-    friendsSortKey: 'diff',
+    friendsSortKey: 'diff',  // can also sort by streak, gp, name, rank
     friendsSortDir: -1,
     friendsMonth: '',
     friendsMonths: [],
@@ -417,6 +445,25 @@ function tracker() {
     },
 
     fmt(n) { return Number(n).toLocaleString('en-US'); },
+    activityColor(streak) {
+      // 10 gradations: -15 to +15 days maps to red to green
+      // Each 3 days = 1 step, 10 steps total
+      const step = Math.max(-5, Math.min(5, Math.round(streak / 3)));
+      const colors = [
+        '#7f1d1d', // -5: deep red
+        '#ef4444', // -4
+        '#f97316', // -3
+        '#f59e0b', // -2
+        '#eab308', // -1
+        '#ef4444', // 0: starts red (unproven)
+        '#4ade80', // +1
+        '#22c55e', // +2
+        '#16a34a', // +3
+        '#15803d', // +4
+        '#166534', // +5: deep green
+      ];
+      return colors[step + 5];
+    },
     currentMonth() {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
