@@ -86,13 +86,16 @@ def get_progress(guild_id: str):
         players_raw.sort(key=lambda x: x["gp"], reverse=True)
         gp_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
 
-        # Add streak, activity level and rank change
+        # Sort by diff to get diff ranks
+        players_raw.sort(key=lambda x: x["diff"], reverse=True)
+        diff_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
+
         players = []
         for p in players_raw:
             streak = get_streak(guild_id, p["id"])
             activity = get_activity_level(guild_id, p["id"])
-            rank = gp_ranks[p["id"]]
-            rank_change = get_rank_change(guild_id, p["id"], rank)
+            diff_rank = diff_ranks[p["id"]]
+            rank_change = get_rank_change(guild_id, p["id"], diff_rank)
             players.append({
                 "name": p["name"],
                 "gp": p["gp"],
@@ -101,11 +104,9 @@ def get_progress(guild_id: str):
                 "diff_pct": p["diff_pct"],
                 "streak": streak,
                 "activity": activity,
-                "rank": rank,
+                "rank": diff_rank,
                 "rank_change": rank_change,
             })
-
-        players.sort(key=lambda x: x["diff"], reverse=True)
 
         return {
             "latest_date": latest_date,
@@ -168,12 +169,16 @@ def get_monthly_progress(guild_id: str):
         players_raw.sort(key=lambda x: x["gp"], reverse=True)
         gp_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
 
+        # Sort by diff to get diff ranks
+        players_raw.sort(key=lambda x: x["diff"], reverse=True)
+        diff_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
+
         players = []
         for p in players_raw:
             streak = get_streak(guild_id, p["id"])
             activity = get_activity_level(guild_id, p["id"])
-            rank = gp_ranks[p["id"]]
-            rank_change = get_rank_change(guild_id, p["id"], rank)
+            diff_rank = diff_ranks[p["id"]]
+            rank_change = get_rank_change(guild_id, p["id"], diff_rank)
             players.append({
                 "name": p["name"],
                 "gp": p["gp"],
@@ -183,11 +188,9 @@ def get_monthly_progress(guild_id: str):
                 "plan_pct": p["plan_pct"],
                 "streak": streak,
                 "activity": activity,
-                "rank": rank,
+                "rank": diff_rank,
                 "rank_change": rank_change,
             })
-
-        players.sort(key=lambda x: x["diff"], reverse=True)
 
         return {
             "latest_date": last_date,
@@ -376,30 +379,53 @@ def get_activity_level(guild_id: str, player_id: str) -> int:
     import math
     return min(10, max(1, round(sum(levels) / len(levels))))
 
-def get_rank_change(guild_id: str, player_id: str, current_rank: int):
-    """Compare rank vs previous snapshot."""
+def get_rank_change(guild_id: str, player_id: str, current_diff_rank: int):
+    """Compare GP Growth rank today vs yesterday."""
     with get_conn() as conn:
         dates = [r[0] for r in conn.execute("""
             SELECT DISTINCT snapshot_date FROM snapshots
-            WHERE guild_id = ? ORDER BY snapshot_date DESC LIMIT 2
+            WHERE guild_id = ? ORDER BY snapshot_date DESC LIMIT 3
         """, (guild_id,)).fetchall()]
 
     if len(dates) < 2:
         return 0
 
-    prev_date = dates[1]
-    with get_conn() as conn:
-        all_prev = conn.execute("""
-            SELECT player_id, gp FROM snapshots
-            WHERE guild_id = ? AND snapshot_date = ?
-            ORDER BY gp DESC
-        """, (guild_id, prev_date)).fetchall()
+    today = dates[0]
+    yesterday = dates[1]
 
-    prev_rank_map = {r[0]: i+1 for i, r in enumerate(all_prev)}
+    with get_conn() as conn:
+        today_gp = {r[0]: r[1] for r in conn.execute(
+            "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+            (guild_id, today)
+        ).fetchall()}
+        yesterday_gp = {r[0]: r[1] for r in conn.execute(
+            "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+            (guild_id, yesterday)
+        ).fetchall()}
+
+    # Calculate yesterday's diffs (vs day before)
+    with get_conn() as conn:
+        if len(dates) >= 3:
+            day_before = dates[2]
+            day_before_gp = {r[0]: r[1] for r in conn.execute(
+                "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+                (guild_id, day_before)
+            ).fetchall()}
+        else:
+            day_before_gp = yesterday_gp
+
+    yesterday_diffs = []
+    for pid, gp in yesterday_gp.items():
+        gp_prev = day_before_gp.get(pid, gp)
+        yesterday_diffs.append((pid, gp - gp_prev))
+
+    yesterday_diffs.sort(key=lambda x: x[1], reverse=True)
+    prev_rank_map = {pid: i+1 for i, (pid, _) in enumerate(yesterday_diffs)}
+
     prev_rank = prev_rank_map.get(player_id)
     if prev_rank is None:
         return 0
-    return prev_rank - current_rank  # positive = moved up
+    return prev_rank - current_diff_rank  # positive = moved up
 
 def get_friends_history(player_ids: list):
     with get_conn() as conn:
