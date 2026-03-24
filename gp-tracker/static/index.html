@@ -80,6 +80,14 @@
   .modal input:focus { border-color: #7c3aed; }
   .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
   .error-msg { font-size: 13px; color: #f87171; margin-bottom: 10px; }
+  .settings-btn { background: transparent; border: 1px solid #2d3148; border-radius: 8px; padding: 8px 10px; color: #64748b; cursor: pointer; font-size: 16px; line-height: 1; }
+  .settings-btn:hover { border-color: #7c3aed; color: #a78bfa; }
+  .plan-pct { font-size: 13px; font-weight: 600; }
+  .plan-pct.done { color: #00e052; }
+  .plan-pct.good { color: #4ade80; }
+  .plan-pct.mid { color: #fbbf24; }
+  .plan-pct.low { color: #f97316; }
+  .plan-pct.none { color: #64748b; }
   .progress-bar-wrap { margin-top: 14px; }
   .progress-bar-label { font-size: 12px; color: #94a3b8; margin-bottom: 6px; display: flex; justify-content: space-between; }
   .progress-bar-bg { background: #141625; border-radius: 6px; height: 6px; overflow: hidden; }
@@ -87,6 +95,19 @@
 </style>
 </head>
 <body x-data="tracker()" x-init="init()">
+
+<div class="modal-bg" x-show="showSettings" @keydown.escape.window="showSettings=false">
+  <div class="modal">
+    <h2>Settings</h2>
+    <label style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:8px;">Monthly GP plan (for all guilds)</label>
+    <input type="number" x-model="planInput" style="width:100%;background:#141625;border:1px solid #2d3148;border-radius:8px;padding:10px 14px;color:#e2e8f0;font-size:14px;outline:none;margin-bottom:12px;" placeholder="100000" @keydown.enter="savePlan()">
+    <div class="error-msg" x-show="planError" x-text="planError"></div>
+    <div class="modal-btns">
+      <button class="btn-sm" @click="showSettings=false">Cancel</button>
+      <button class="btn" @click="savePlan()">Save</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-bg" x-show="showModal" @keydown.escape.window="showModal=false">
   <div class="modal">
@@ -113,6 +134,7 @@
   <h1>GP Tracker</h1>
   <div style="display:flex;gap:10px;align-items:center;">
     <a href="/api/backup" class="btn-sm" style="text-decoration:none;padding:8px 14px;font-size:13px;">Download backup</a>
+    <button class="settings-btn" @click="openSettings()" title="Settings">⚙</button>
     <button class="btn" @click="showModal=true; wrongPassword=false">Refresh data</button>
   </div>
 </div>
@@ -166,6 +188,7 @@
             <th @click="friendsSort('gp')">GP now</th>
             <th @click="friendsSort('diff')">GP growth</th>
             <th @click="friendsSort('streak')">Streak</th>
+            <th @click="friendsSort('plan_pct')" x-text="'Plan ' + fmt(monthlyPlan)">Plan</th>
           </tr>
         </thead>
         <tbody>
@@ -185,35 +208,12 @@
               <td class="gp" x-text="fmt(p.gp)"></td>
               <td class="diff" :class="p.diff>0?'pos':p.diff<0?'neg':'zero'" x-text="(p.diff>0?'+':'')+fmt(p.diff)"></td>
               <td :class="p.streak>0?'streak-pos':p.streak<0?'streak-neg':'streak-zero'" x-text="p.streak>0?'+'+p.streak+' days':p.streak<0?p.streak+' days':'—'"></td>
+              <td><span :class="planPctClass(p.plan_pct)" x-text="p.plan_pct > 0 ? p.plan_pct + '%' : '—'"></span></td>
             </tr>
           </template>
         </tbody>
       </table>
     </div>
-    <div x-show="friendsData.players && friendsData.players.length > 0" style="margin-top:28px;">
-      <div style="font-size:15px;font-weight:500;color:#94a3b8;margin-bottom:24px;text-align:center;">Who's got the longest... 👀</div>
-      <div style="display:flex;flex-direction:column;gap:18px;">
-        <template x-for="p in friendsChart30()" :key="p.name">
-          <div style="display:flex;align-items:center;gap:14px;">
-            <div style="width:160px;font-size:13px;color:#e2e8f0;text-align:right;flex-shrink:0;" x-text="p.name"></div>
-            <div style="flex:1;position:relative;height:36px;">
-              <div x-show="p.growth > 0"
-                style="position:absolute;left:0;top:0;height:36px;display:flex;align-items:center;"
-                :style="'width:calc(' + p.pct + '% + 24px);'">
-                <div style="flex:1;height:36px;display:flex;align-items:center;" :style="'background:' + p.color + ';'">
-                  <span style="padding-left:12px;font-size:12px;font-weight:600;color:rgba(0,0,0,0.75);white-space:nowrap;" x-text="'+' + fmt(p.growth)"></span>
-                </div>
-                <div style="width:24px;height:48px;flex-shrink:0;border-radius:0 50% 50% 0;margin-left:-1px;"
-                  :style="'background:' + p.color + ';filter:brightness(0.65);'"></div>
-              </div>
-              <span x-show="p.growth === 0" style="font-size:12px;color:#64748b;line-height:36px;">no growth</span>
-            </div>
-          </div>
-        </template>
-      </div>
-      <div style="font-size:11px;color:#334155;margin-top:16px;text-align:right;">GP growth over last 30 days</div>
-    </div>
-
     <div class="chart-wrap" x-show="friendsHistory.length > 0">
       <div class="chart-title">GP growth over time</div>
       <canvas id="friendsChart" height="100"></canvas>
@@ -265,6 +265,7 @@
             <th @click="sort('gp')">GP now</th>
             <th @click="sort('diff')">GP growth</th>
             <th @click="sort('streak')">Streak</th>
+            <th @click="sort('plan_pct')" x-text="'Plan ' + fmt(monthlyPlan)">Plan</th>
           </tr>
         </thead>
         <tbody>
@@ -284,6 +285,7 @@
               <td class="gp" x-text="fmt(p.gp)"></td>
               <td class="diff" :class="p.diff>0?'pos':p.diff<0?'neg':'zero'" x-text="(p.diff>0?'+':'')+fmt(p.diff)"></td>
               <td :class="p.streak>0?'streak-pos':p.streak<0?'streak-neg':'streak-zero'" x-text="p.streak>0?'+'+p.streak+' days':p.streak<0?p.streak+' days':'—'"></td>
+              <td><span :class="planPctClass(p.plan_pct)" x-text="p.plan_pct > 0 ? p.plan_pct + '%' : '—'"></span></td>
             </tr>
           </template>
         </tbody>
@@ -311,7 +313,11 @@ function tracker() {
     search: '',
     sortKey: 'diff',
     sortDir: -1,
-    friendsSortKey: 'diff',  // can also sort by streak, gp, name, rank
+    friendsSortKey: 'diff',
+    monthlyPlan: 100000,
+    showSettings: false,
+    planInput: 100000,
+    planError: '',
     friendsSortDir: -1,
     friendsMonth: '',
     friendsMonths: [],
@@ -525,6 +531,35 @@ function tracker() {
       const idx = Math.min(10, Math.max(1, level || 1)) - 1;
       return colors[idx];
     },
+    openSettings() {
+      this.planInput = this.monthlyPlan;
+      this.planError = '';
+      this.showSettings = true;
+    },
+
+    async savePlan() {
+      const plan = parseInt(this.planInput);
+      if (!plan || plan < 1000) { this.planError = 'Minimum plan is 1,000'; return; }
+      if (plan > 10000000) { this.planError = 'Maximum plan is 10,000,000'; return; }
+      const r = await fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({monthly_plan: plan})
+      });
+      const data = await r.json();
+      this.monthlyPlan = data.monthly_plan;
+      this.showSettings = false;
+      await this.autoRefresh();
+    },
+
+    planPctClass(pct) {
+      if (!pct || pct === 0) return 'plan-pct none';
+      if (pct >= 100) return 'plan-pct done';
+      if (pct >= 70) return 'plan-pct good';
+      if (pct >= 40) return 'plan-pct mid';
+      return 'plan-pct low';
+    },
+
     currentMonth() {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
