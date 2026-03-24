@@ -63,6 +63,8 @@
   .table-title { font-size: 15px; font-weight: 500; color: #94a3b8; text-align: center; margin-bottom: 12px; }
   .guild-link { font-size: 12px; color: #7c3aed; text-decoration: none; border: 1px solid rgba(124,58,237,0.3); border-radius: 6px; padding: 4px 10px; transition: background 0.2s; }
   .guild-link:hover { background: rgba(124,58,237,0.15); }
+  th.sorted { color: #a78bfa !important; }
+  th.sorted::after { content: ''; display:inline-block; margin-left:4px; }
   .rank-cell { display: flex; align-items: baseline; gap: 4px; }
   .rank-change { font-size: 10px; font-weight: 500; }
   .rank-change.up { color: #34d399; }
@@ -150,11 +152,7 @@
 
   <!-- Friends tab -->
   <div x-show="activeTab === 'friends'">
-    <div class="stats-row" x-show="friendsData.players && friendsData.players.length">
-      <div class="stat-card">
-        <div class="label">Friends</div>
-        <div class="value" x-text="friendsData.players ? friendsData.players.length : 0"></div>
-      </div>
+    <div class="stats-row" x-show="friendsData.players && friendsData.players.length" style="grid-template-columns:repeat(2,1fr);">
       <div class="stat-card">
         <div class="label">Total GP</div>
         <div class="value" x-text="friendsTotalGP()"></div>
@@ -182,13 +180,13 @@
       <table x-show="!loadingFriends && friendsData.players && friendsData.players.length > 0">
         <thead>
           <tr>
-            <th @click="friendsSort('rank')">#</th>
+            <th @click="friendsSort('rank')" :class="friendsSortKey==='rank'?'sorted':''"> #</th>
             <th></th>
-            <th @click="friendsSort('name')">Player</th>
-            <th @click="friendsSort('gp')">GP now</th>
-            <th @click="friendsSort('diff')">GP growth</th>
-            <th @click="friendsSort('streak')">Streak</th>
-            <th @click="friendsSort('plan_pct')" x-text="'Plan ' + fmt(monthlyPlan)">Plan</th>
+            <th @click="friendsSort('name')" :class="friendsSortKey==='name'?'sorted':''">Player</th>
+            <th @click="friendsSort('gp')" :class="friendsSortKey==='gp'?'sorted':''">GP now</th>
+            <th @click="friendsSort('diff')" :class="friendsSortKey==='diff'?'sorted':''">GP growth</th>
+            <th @click="friendsSort('streak')" :class="friendsSortKey==='streak'?'sorted':''">Streak</th>
+            <th @click="friendsSort('plan_pct')" :class="friendsSortKey==='plan_pct'?'sorted':''" x-text="'Plan ' + fmt(monthlyPlan)">Plan</th>
           </tr>
         </thead>
         <tbody>
@@ -272,13 +270,13 @@
       <table x-show="!loadingGuild && guildData.players && guildData.players.length > 0">
         <thead>
           <tr>
-            <th @click="sort('rank')">#</th>
+            <th @click="sort('rank')" :class="sortKey==='rank'?'sorted':''"> #</th>
             <th></th>
-            <th @click="sort('name')">Player</th>
-            <th @click="sort('gp')">GP now</th>
-            <th @click="sort('diff')">GP growth</th>
-            <th @click="sort('streak')">Streak</th>
-            <th @click="sort('plan_pct')" x-text="'Plan ' + fmt(monthlyPlan)">Plan</th>
+            <th @click="sort('name')" :class="sortKey==='name'?'sorted':''">Player</th>
+            <th @click="sort('gp')" :class="sortKey==='gp'?'sorted':''">GP now</th>
+            <th @click="sort('diff')" :class="sortKey==='diff'?'sorted':''">GP growth</th>
+            <th @click="sort('streak')" :class="sortKey==='streak'?'sorted':''">Streak</th>
+            <th @click="sort('plan_pct')" :class="sortKey==='plan_pct'?'sorted':''" x-text="'Plan ' + fmt(monthlyPlan)">Plan</th>
           </tr>
         </thead>
         <tbody>
