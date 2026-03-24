@@ -154,8 +154,6 @@ async def fetch_all():
     collection_status["done"] = collection_status["total"]
     print("Collection complete.")
 
-scheduler = AsyncIOScheduler()
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
