@@ -9,6 +9,12 @@ def get_conn():
 def init_db():
     with get_conn() as conn:
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 snapshot_date TEXT NOT NULL,
@@ -108,6 +114,89 @@ def get_progress(guild_id: str):
             "dates": dates
         }
 
+def get_monthly_progress(guild_id: str):
+    """Get GP growth from 1st of current month to today for all players."""
+    from datetime import date
+    today = str(date.today())
+    month_start = today[:8] + "01"
+
+    with get_conn() as conn:
+        # First snapshot of this month
+        first_date = conn.execute("""
+            SELECT MIN(snapshot_date) FROM snapshots
+            WHERE guild_id = ? AND snapshot_date >= ?
+        """, (guild_id, month_start)).fetchone()[0]
+
+        # Latest snapshot
+        last_date = conn.execute("""
+            SELECT MAX(snapshot_date) FROM snapshots
+            WHERE guild_id = ?
+        """, (guild_id,)).fetchone()[0]
+
+        if not first_date or not last_date:
+            return {"dates": [], "players": [], "latest_date": None, "prev_date": None}
+
+        latest = {r[0]: {"name": r[1], "gp": r[2]} for r in conn.execute(
+            "SELECT player_id, player_name, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+            (guild_id, last_date)
+        ).fetchall()}
+
+        prev = {}
+        if first_date != last_date:
+            prev = {r[0]: r[1] for r in conn.execute(
+                "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+                (guild_id, first_date)
+            ).fetchall()}
+
+        monthly_plan = int(get_setting("monthly_plan", "100000"))
+
+        players_raw = []
+        for pid, data in latest.items():
+            gp_now = data["gp"]
+            gp_prev = prev.get(pid, gp_now)
+            diff = gp_now - gp_prev
+            players_raw.append({
+                "id": pid,
+                "name": data["name"],
+                "gp": gp_now,
+                "gp_prev": gp_prev,
+                "diff": diff,
+                "diff_pct": round(diff / gp_prev * 100, 2) if gp_prev > 0 else 0,
+                "plan_pct": round(diff / monthly_plan * 100, 1) if monthly_plan > 0 else 0,
+            })
+
+        players_raw.sort(key=lambda x: x["gp"], reverse=True)
+        gp_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
+
+        players = []
+        for p in players_raw:
+            streak = get_streak(guild_id, p["id"])
+            activity = get_activity_level(guild_id, p["id"])
+            rank = gp_ranks[p["id"]]
+            rank_change = get_rank_change(guild_id, p["id"], rank)
+            players.append({
+                "name": p["name"],
+                "gp": p["gp"],
+                "gp_prev": p["gp_prev"],
+                "diff": p["diff"],
+                "diff_pct": p["diff_pct"],
+                "plan_pct": p["plan_pct"],
+                "streak": streak,
+                "activity": activity,
+                "rank": rank,
+                "rank_change": rank_change,
+            })
+
+        players.sort(key=lambda x: x["diff"], reverse=True)
+
+        return {
+            "latest_date": last_date,
+            "prev_date": first_date,
+            "players": players,
+            "dates": [first_date, last_date],
+            "monthly_plan": monthly_plan,
+        }
+
 def get_available_months(guild_id: str):
     with get_conn() as conn:
         rows = conn.execute("""
@@ -190,6 +279,16 @@ def get_progress_for_month(guild_id: str, month: str):
             "players": players,
             "dates": [first_date, last_date]
         }
+
+def get_setting(key: str, default: str = "") -> str:
+    with get_conn() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else default
+
+def set_setting(key: str, value: str):
+    with get_conn() as conn:
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+        conn.commit()
 
 def get_streak(guild_id: str, player_id: str):
     """Count consecutive days of positive/negative GP growth."""

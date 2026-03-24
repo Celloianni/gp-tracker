@@ -3,13 +3,12 @@ import httpx
 import asyncio
 from datetime import date
 from contextlib import asynccontextmanager
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse as FastAPIFileResponse
 import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month
+from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
@@ -201,7 +200,7 @@ async def guilds(auth: bool = Depends(check_auth)):
 async def progress(guild_id: str, month: str = None, auth: bool = Depends(check_auth)):
     if month:
         return get_progress_for_month(guild_id, month)
-    return get_progress(guild_id)
+    return get_monthly_progress(guild_id)
 
 @app.get("/api/months/{guild_id:path}")
 async def months(guild_id: str, auth: bool = Depends(check_auth)):
@@ -211,6 +210,29 @@ async def months(guild_id: str, auth: bool = Depends(check_auth)):
 async def friends_history(auth: bool = Depends(check_auth)):
     friend_ids = [f["allyCode"] for f in FRIENDS]
     return get_friends_history(friend_ids)
+
+@app.post("/api/cron")
+async def cron_trigger(request: Request):
+    token = request.headers.get("X-Cron-Token", "")
+    cron_secret = os.getenv("CRON_SECRET", "")
+    if not cron_secret or token != cron_secret:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    asyncio.create_task(fetch_all())
+    return {"status": "started"}
+
+@app.get("/api/settings")
+async def get_settings(auth: bool = Depends(check_auth)):
+    return {"monthly_plan": int(get_setting("monthly_plan", "100000"))}
+
+@app.post("/api/settings")
+async def update_settings(request: Request, auth: bool = Depends(check_auth)):
+    body = await request.json()
+    if "monthly_plan" in body:
+        plan = int(body["monthly_plan"])
+        if plan < 1000 or plan > 10000000:
+            raise HTTPException(status_code=400, detail="Plan must be between 1,000 and 10,000,000")
+        set_setting("monthly_plan", str(plan))
+    return {"status": "ok", "monthly_plan": int(get_setting("monthly_plan", "100000"))}
 
 @app.get("/api/status")
 async def status(auth: bool = Depends(check_auth)):
