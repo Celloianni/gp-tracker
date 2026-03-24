@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, FileResponse as Fa
 import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting
+from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
@@ -205,6 +205,10 @@ async def months(guild_id: str, auth: bool = Depends(check_auth)):
 async def friends_history(auth: bool = Depends(check_auth)):
     friend_ids = [f["allyCode"] for f in FRIENDS]
     return get_friends_history(friend_ids)
+
+@app.get("/api/friends/achievements")
+async def friends_achievements(auth: bool = Depends(check_auth)):
+    return get_monthly_achievements("friends")
 
 @app.post("/api/cron")
 async def cron_trigger(request: Request):
