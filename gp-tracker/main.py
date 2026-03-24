@@ -157,14 +157,11 @@ async def fetch_all():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    scheduler.add_job(fetch_all, "cron", hour=6, minute=0)
-    scheduler.start()
-    print("Scheduler started. Data collection every day at 06:00.")
+    print("App started.")
     if is_empty():
         print("Database empty — collecting now...")
         asyncio.create_task(fetch_all())
     yield
-    scheduler.shutdown()
 
 app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
