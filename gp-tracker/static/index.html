@@ -214,6 +214,19 @@
         </tbody>
       </table>
     </div>
+    <div style="margin-top:24px;padding:20px 24px;background:#1a1d2e;border:1px solid #2d3148;border-radius:12px;">
+      <div style="font-size:13px;font-weight:500;color:#64748b;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.05em;">Як читати таблицю</div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:#94a3b8;line-height:1.6;">
+        <div><span style="color:#e2e8f0;font-weight:500;">#</span> — порядковий номер у поточному сортуванні. За замовчуванням — по GP Growth, тому #1 = найбільший приріст за місяць.</div>
+        <div><span style="color:#34d399;font-weight:500;">↑↓</span> — зміна позиції по GP Growth відносно вчора.</div>
+        <div><span style="color:#e2e8f0;font-weight:500;">●</span> — рівень активності від 1 до 10. Рахується по приросту GP за останні 30 днів. Кожні 10,000 GP = +1 рівень. 100,000 GP за 30 днів = рівень 10 (яскраво-зелений). Згладжується по останніх 7 днях.</div>
+        <div><span style="color:#e2e8f0;font-weight:500;">GP Now</span> — поточний GP гравця на момент останнього снапшоту.</div>
+        <div><span style="color:#e2e8f0;font-weight:500;">GP Growth</span> — приріст GP з 1-го числа поточного місяця до сьогодні. На початку нового місяця скидається до нуля.</div>
+        <div><span style="color:#e2e8f0;font-weight:500;">Streak</span> — кількість днів поспіль з позитивним або негативним приростом. +3 days = три дні поспіль GP ріс. -1 days = вчора GP не виріс.</div>
+        <div><span style="color:#e2e8f0;font-weight:500;">Plan %</span> — відсоток виконання місячного плану. План можна змінити через ⚙ у шапці.</div>
+      </div>
+    </div>
+
     <div class="chart-wrap" x-show="friendsHistory.length > 0">
       <div class="chart-title">GP growth over time</div>
       <canvas id="friendsChart" height="100"></canvas>
