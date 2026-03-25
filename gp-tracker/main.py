@@ -197,47 +197,6 @@ async def progress(guild_id: str, month: str = None, auth: bool = Depends(check_
         return get_progress_for_month(guild_id, month)
     return get_monthly_progress(guild_id)
 
-@app.get("/api/test/roster")
-async def test_roster(auth: bool = Depends(check_auth)):
-    import time
-    import json
-    start = time.time()
-    results = []
-    total_bytes = 0
-
-    async with httpx.AsyncClient(timeout=120) as client:
-        for f in FRIENDS:
-            t0 = time.time()
-            try:
-                r = await client.post(f"{COMLINK_URL}/player", json={
-                    "payload": {"allyCode": f["allyCode"]},
-                    "enums": False
-                })
-                r.raise_for_status()
-                data = r.json()
-                size = len(r.content)
-                total_bytes += size
-                results.append({
-                    "name": f["name"],
-                    "allyCode": f["allyCode"],
-                    "time_ms": round((time.time() - t0) * 1000),
-                    "size_kb": round(size / 1024, 1),
-                    "keys": list(data.keys()),
-                    "roster_count": len(data.get("rosterUnit", [])),
-                    "profile_stats": len(data.get("profileStat", [])),
-                })
-            except Exception as e:
-                results.append({"name": f["name"], "error": str(e)})
-            await asyncio.sleep(0.2)
-
-    total_time = round((time.time() - start) * 1000)
-    return {
-        "total_time_ms": total_time,
-        "total_size_kb": round(total_bytes / 1024, 1),
-        "total_size_mb": round(total_bytes / 1024 / 1024, 2),
-        "players": results
-    }
-
 @app.get("/api/months/{guild_id:path}")
 async def months(guild_id: str, auth: bool = Depends(check_auth)):
     return get_available_months(guild_id)
