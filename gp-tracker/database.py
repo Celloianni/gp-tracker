@@ -322,62 +322,32 @@ def get_streak(guild_id: str, player_id: str):
 
     return streak if first_positive else -streak
 
-def _calc_level(gp_now: int, gp_30d: int) -> int:
-    """Calculate activity level 1-10 based on 30-day GP growth."""
-    import math
-    growth = max(0, gp_now - gp_30d)
-    return min(10, max(1, math.ceil(growth / 10000)))
-
 def get_activity_level(guild_id: str, player_id: str) -> int:
     """
-    Calculate activity level 1-10 using sliding 30-day window.
-    Uses average of last 7 available daily levels for smoothing.
-    Returns 1 (red) if insufficient data.
+    Calculate activity level 1-10 based on smoothed streak history.
+    Each day of positive GP growth: +1 level (max 10)
+    Each day of negative/zero GP growth: -1 level (min 1)
+    Starts at level 1 if no data.
     """
-    from datetime import datetime, timedelta
-
     with get_conn() as conn:
-        # Get all snapshots for this player, newest first
         rows = conn.execute("""
             SELECT snapshot_date, gp FROM snapshots
             WHERE guild_id = ? AND player_id = ?
-            ORDER BY snapshot_date DESC LIMIT 40
+            ORDER BY snapshot_date ASC
         """, (guild_id, player_id)).fetchall()
 
     if len(rows) < 2:
         return 1
 
-    # Build date->gp map
-    gp_map = {r[0]: r[1] for r in rows}
-    dates_sorted = sorted(gp_map.keys())
-
-    # For each of last 7 available dates, calculate level
-    recent_dates = dates_sorted[-7:]
-    levels = []
-
-    for d in recent_dates:
-        gp_now = gp_map[d]
-        # Find nearest earlier date ~30 days ago
-        target = (datetime.strptime(d, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
-        # Pick closest available date <= target
-        earlier = [x for x in dates_sorted if x <= target]
-        if not earlier:
-            # Not enough history yet — use earliest available
-            earliest = dates_sorted[0]
-            if earliest == d:
-                levels.append(1)
-                continue
-            gp_30d = gp_map[earliest]
+    level = 1
+    for i in range(1, len(rows)):
+        diff = rows[i][1] - rows[i-1][1]
+        if diff > 0:
+            level = min(10, level + 1)
         else:
-            gp_30d = gp_map[earlier[-1]]
+            level = max(1, level - 1)
 
-        levels.append(_calc_level(gp_now, gp_30d))
-
-    if not levels:
-        return 1
-
-    import math
-    return min(10, max(1, round(sum(levels) / len(levels))))
+    return level
 
 def get_rank_change(guild_id: str, player_id: str, current_diff_rank: int):
     """Compare GP Growth rank today vs yesterday."""
