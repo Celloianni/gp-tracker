@@ -428,95 +428,64 @@ def get_rank_change(guild_id: str, player_id: str, current_diff_rank: int):
     return prev_rank - current_diff_rank  # positive = moved up
 
 def get_monthly_achievements(guild_id: str) -> dict:
-    """Calculate achievements for each player based on last completed month and current streak."""
+    """Calculate achievements. Monthly ones shown only first 7 days of new month."""
     from datetime import date, timedelta
-    from calendar import monthrange
 
     today = date.today()
-    # Last month
-    first_of_this_month = today.replace(day=1)
-    last_month_end = first_of_this_month - timedelta(days=1)
-    last_month_start = last_month_end.replace(day=1)
-
-    with get_conn() as conn:
-        # Get last month's first and last snapshots
-        lm_first = conn.execute("""
-            SELECT MIN(snapshot_date) FROM snapshots
-            WHERE guild_id = ? AND snapshot_date >= ? AND snapshot_date <= ?
-        """, (guild_id, str(last_month_start), str(last_month_end))).fetchone()[0]
-
-        lm_last = conn.execute("""
-            SELECT MAX(snapshot_date) FROM snapshots
-            WHERE guild_id = ? AND snapshot_date >= ? AND snapshot_date <= ?
-        """, (guild_id, str(last_month_start), str(last_month_end))).fetchone()[0]
-
     achievements = {}  # player_name -> list of (emoji, tooltip)
 
-    if lm_first and lm_last and lm_first != lm_last:
-        with get_conn() as conn:
-            latest_gp = {r[0]: (r[1], r[2]) for r in conn.execute(
-                "SELECT player_id, player_name, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
-                (guild_id, lm_last)
-            ).fetchall()}
-            first_gp = {r[0]: r[1] for r in conn.execute(
-                "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
-                (guild_id, lm_first)
-            ).fetchall()}
-
-        diffs = []
-        for pid, (name, gp_now) in latest_gp.items():
-            gp_prev = first_gp.get(pid, gp_now)
-            diffs.append((pid, name, gp_now - gp_prev))
-
-        diffs.sort(key=lambda x: x[2], reverse=True)
+    # Monthly achievements — only show first 7 days of the month
+    if today.day <= 7:
+        first_of_this_month = today.replace(day=1)
+        last_month_end = first_of_this_month - timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1)
         month_name = last_month_end.strftime("%B %Y")
 
-        for i, (pid, name, diff) in enumerate(diffs):
-            if name not in achievements:
-                achievements[name] = []
-            rank = i + 1
-            if diff < 0:
-                achievements[name].append(("☠️", f"Від'ємний приріст GP у {month_name}"))
-            elif diff == 0:
-                achievements[name].append(("❄️", f"Нульовий приріст у {month_name}"))
-            elif rank == 1:
-                achievements[name].append(("🥇", f"1-е місце по приросту GP у {month_name}"))
-            elif rank == 2:
-                achievements[name].append(("🥈", f"2-е місце по приросту GP у {month_name}"))
-            elif rank == 3:
-                achievements[name].append(("🥉", f"3-є місце по приросту GP у {month_name}"))
-            elif rank == len(diffs):
-                achievements[name].append(("🐢", f"Останнє місце по приросту GP у {month_name}"))
+        with get_conn() as conn:
+            lm_first = conn.execute("""
+                SELECT MIN(snapshot_date) FROM snapshots
+                WHERE guild_id = ? AND snapshot_date >= ? AND snapshot_date <= ?
+            """, (guild_id, str(last_month_start), str(last_month_end))).fetchone()[0]
 
-    # Streak achievements (current)
-    with get_conn() as conn:
-        player_ids = [r[0] for r in conn.execute(
-            "SELECT DISTINCT player_id FROM snapshots WHERE guild_id = ? ORDER BY snapshot_date DESC LIMIT 1000",
-            (guild_id,)
-        ).fetchall()]
-        names = {r[0]: r[1] for r in conn.execute(
-            "SELECT DISTINCT player_id, player_name FROM snapshots WHERE guild_id = ?",
-            (guild_id,)
-        ).fetchall()}
+            lm_last = conn.execute("""
+                SELECT MAX(snapshot_date) FROM snapshots
+                WHERE guild_id = ? AND snapshot_date >= ? AND snapshot_date <= ?
+            """, (guild_id, str(last_month_start), str(last_month_end))).fetchone()[0]
 
-    for pid in player_ids:
-        streak = get_streak(guild_id, pid)
-        name = names.get(pid)
-        if not name:
-            continue
-        if name not in achievements:
-            achievements[name] = []
+        if lm_first and lm_last and lm_first != lm_last:
+            with get_conn() as conn:
+                latest_gp = {r[0]: (r[1], r[2]) for r in conn.execute(
+                    "SELECT player_id, player_name, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+                    (guild_id, lm_last)
+                ).fetchall()}
+                first_gp = {r[0]: r[1] for r in conn.execute(
+                    "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+                    (guild_id, lm_first)
+                ).fetchall()}
 
-        if streak >= 30:
-            achievements[name].append(("🔥🔥🔥", f"Streak {streak} днів поспіль — весь місяць!"))
-        elif streak >= 14:
-            achievements[name].append(("🔥🔥", f"Streak {streak} днів поспіль"))
-        elif streak >= 7:
-            achievements[name].append(("🔥", f"Streak {streak} днів поспіль"))
-        elif streak <= -6:
-            achievements[name].append(("🐌", f"Не качається {abs(streak)} днів поспіль"))
-        elif streak <= -3:
-            achievements[name].append(("🥶", f"Заморожений — {abs(streak)} дні без приросту"))
+            diffs = []
+            for pid, (name, gp_now) in latest_gp.items():
+                gp_prev = first_gp.get(pid, gp_now)
+                diffs.append((pid, name, gp_now - gp_prev))
+
+            diffs.sort(key=lambda x: x[2], reverse=True)
+
+            for i, (pid, name, diff) in enumerate(diffs):
+                if name not in achievements:
+                    achievements[name] = []
+                rank = i + 1
+                if diff < 0:
+                    achievements[name].append(("☠️", f"Від'ємний приріст GP у {month_name}"))
+                elif diff == 0:
+                    achievements[name].append(("❄️", f"Нульовий приріст у {month_name}"))
+                elif rank == 1:
+                    achievements[name].append(("🥇", f"1-й по приросту GP у {month_name}"))
+                elif rank == 2:
+                    achievements[name].append(("🥈", f"2-й по приросту GP у {month_name}"))
+                elif rank == 3:
+                    achievements[name].append(("🥉", f"3-й по приросту GP у {month_name}"))
+                elif rank == len(diffs):
+                    achievements[name].append(("🐌", f"Равлик по приросту GP у {month_name}"))
 
     return achievements
 
