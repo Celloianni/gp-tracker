@@ -439,7 +439,12 @@ def get_monthly_achievements(guild_id: str) -> dict:
         first_of_this_month = today.replace(day=1)
         last_month_end = first_of_this_month - timedelta(days=1)
         last_month_start = last_month_end.replace(day=1)
-        month_name = last_month_end.strftime("%B %Y")
+        ua_months = {
+            1: "Січні", 2: "Лютому", 3: "Березні", 4: "Квітні",
+            5: "Травні", 6: "Червні", 7: "Липні", 8: "Серпні",
+            9: "Вересні", 10: "Жовтні", 11: "Листопаді", 12: "Грудні"
+        }
+        month_name = f"у {ua_months[last_month_end.month]} {last_month_end.year}"
 
         with get_conn() as conn:
             lm_first = conn.execute("""
