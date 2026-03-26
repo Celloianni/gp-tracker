@@ -384,6 +384,18 @@ async def sync_unit_names(request: Request, auth: bool = Depends(check_auth)):
 async def unit_names_status(auth: bool = Depends(check_auth)):
     return {"count": get_unit_names_count()}
 
+@app.get("/api/test/relic/{player_id}")
+async def test_relic(player_id: str, auth: bool = Depends(check_auth)):
+    """Show raw relic_tier values from DB for a player (for debugging)."""
+    from database import get_conn
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT unit_id, relic_tier FROM roster_snapshots
+            WHERE player_id = ? AND relic_tier >= 2
+            ORDER BY relic_tier DESC LIMIT 20
+        """, (player_id,)).fetchall()
+    return [{"unit_id": r[0], "relic_tier_stored": r[1], "relic_tier_displayed": r[1] - 1} for r in rows]
+
 @app.get("/api/test/localization")
 async def test_localization(auth: bool = Depends(check_auth)):
     """Test swgoh.gg API for unit names."""
