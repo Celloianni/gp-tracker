@@ -400,6 +400,25 @@ async def test_relic(player_id: str, auth: bool = Depends(check_auth)):
         """, (player_id,)).fetchall()
     return [{"unit_id": r[0], "relic_tier_stored": r[1], "relic_tier_displayed": r[1] - 1} for r in rows]
 
+@app.get("/api/test/unit_stat/{ally_code}")
+async def test_unit_stat(ally_code: str, auth: bool = Depends(check_auth)):
+    """Show raw stat fields from first rosterUnit for a player."""
+    async with httpx.AsyncClient(timeout=60) as client:
+        r = await client.post(f"{COMLINK_URL}/player", json={"payload": {"allyCode": ally_code}, "enums": False})
+        r.raise_for_status()
+        pdata = r.json()
+        units = pdata.get("rosterUnit", [])
+        if not units:
+            return {"error": "no units"}
+        u = units[0]
+        return {
+            "definitionId": u.get("definitionId"),
+            "keys": list(u.keys()),
+            "stat": u.get("stat"),
+            "combatStats": u.get("combatStats"),
+            "primaryStat": u.get("primaryStat"),
+        }
+
 @app.get("/api/test/localization")
 async def test_localization(auth: bool = Depends(check_auth)):
     """Test swgoh.gg API for unit names."""
