@@ -115,7 +115,7 @@
               <div class="change-detail">
                 <span class="new-badge">NEW</span>
                 <span class="stars" x-text="'⭐'.repeat(change.stars || 1)"></span>
-                <span x-show="change.relic_tier >= 2" class="relic-badge" x-text="'R' + (change.relic_tier - 1)"></span>
+                <span x-show="change.relic_tier >= 3" class="relic-badge" x-text="'R' + (change.relic_tier - 2)"></span>
               </div>
             </div>
           </template>
@@ -334,8 +334,8 @@ function playerApp() {
       if (c.field === 'level') return `Lvl ${c.from} → ${c.to}`;
       if (c.field === 'gear_tier') return `G${c.from} → G${c.to}`;
       if (c.field === 'relic_tier') {
-        const fromR = c.from <= 1 ? 'G13' : `R${c.from - 1}`;
-        const toR = `R${c.to - 1}`;
+        const fromR = c.from <= 2 ? 'G13' : `R${c.from - 2}`;
+        const toR = `R${c.to - 2}`;
         return `${fromR} → ${toR}`;
       }
       if (c.field === 'ability') {
