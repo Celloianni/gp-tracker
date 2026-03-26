@@ -367,6 +367,31 @@ async def sync_unit_names(request: Request, auth: bool = Depends(check_auth)):
 async def unit_names_status(auth: bool = Depends(check_auth)):
     return {"count": get_unit_names_count()}
 
+@app.get("/api/test/localization")
+async def test_localization(auth: bool = Depends(check_auth)):
+    """Test what localization formats comlink accepts."""
+    results = {}
+    async with httpx.AsyncClient(timeout=30) as client:
+        # Try 1: payload wrapper
+        try:
+            r = await client.post(f"{COMLINK_URL}/localization", json={"payload": {"id": "Loc_ENG_US.txt"}})
+            results["with_payload"] = {"status": r.status_code, "body_preview": r.text[:200]}
+        except Exception as e:
+            results["with_payload"] = {"error": str(e)}
+        # Try 2: no wrapper
+        try:
+            r = await client.post(f"{COMLINK_URL}/localization", json={"id": "Loc_ENG_US.txt"})
+            results["no_wrapper"] = {"status": r.status_code, "body_preview": r.text[:200]}
+        except Exception as e:
+            results["no_wrapper"] = {"error": str(e)}
+        # Try 3: GET
+        try:
+            r = await client.get(f"{COMLINK_URL}/localization/ENG_US")
+            results["get_eng_us"] = {"status": r.status_code, "body_preview": r.text[:200]}
+        except Exception as e:
+            results["get_eng_us"] = {"error": str(e)}
+    return results
+
 @app.get("/api/friends/list")
 async def friends_list(auth: bool = Depends(check_auth)):
     """Return friends list with ally codes for player page routing."""
