@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GP Tracker — Player</title>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+  .header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 16px 32px; display: flex; align-items: center; gap: 16px; }
+  .back-link { color: #a78bfa; text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .back-link:hover { color: #c4b5fd; }
+  .header-title { font-size: 20px; font-weight: 600; color: #e2e8f0; }
+  .header-gp { font-size: 14px; color: #64748b; margin-left: auto; }
+  .container { max-width: 900px; margin: 0 auto; padding: 28px 20px; }
+  .section { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; }
+  .section-title { font-size: 14px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+  .date-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .date-nav select { background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 7px 12px; color: #e2e8f0; font-size: 13px; outline: none; cursor: pointer; }
+  .date-nav select:focus { border-color: #7c3aed; }
+  .btn-nav { background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 6px 12px; color: #94a3b8; cursor: pointer; font-size: 16px; transition: all 0.2s; }
+  .btn-nav:hover:not(:disabled) { border-color: #7c3aed; color: #a78bfa; }
+  .btn-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+  .changes-list { display: flex; flex-direction: column; gap: 8px; }
+  .change-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: #141625; border-radius: 8px; border: 1px solid #1e2235; }
+  .change-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+  .change-name { font-weight: 500; color: #e2e8f0; flex: 1; min-width: 0; }
+  .change-name small { display: block; font-size: 11px; color: #64748b; font-weight: 400; }
+  .change-detail { font-size: 13px; color: #94a3b8; white-space: nowrap; }
+  .change-detail .arrow { color: #34d399; margin: 0 4px; }
+  .change-detail .new-badge { background: #065f46; color: #34d399; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+  .empty-changes { text-align: center; padding: 40px; color: #64748b; }
+  .chart-wrap { }
+  .loading { text-align: center; padding: 60px; color: #64748b; }
+  .stars { color: #fbbf24; font-size: 12px; }
+  .relic-badge { background: #1e1b4b; color: #a78bfa; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+  .gear-badge { background: #1c2d1e; color: #4ade80; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+  .type-badge { font-size: 11px; color: #64748b; }
+  .unit-names-warn { background: #1c1410; border: 1px solid #92400e; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #fbbf24; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .btn-sync { background: #7c3aed; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .btn-sync:hover { background: #6d28d9; }
+  .btn-sync:disabled { background: #3d2d6e; cursor: not-allowed; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 14px; height: 14px; border: 2px solid #3d2d6e; border-top-color: #a78bfa; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle; }
+</style>
+</head>
+<body x-data="playerApp()" x-init="init()">
+
+<div class="header">
+  <a href="/" class="back-link">← Friends</a>
+  <div class="header-title" x-text="playerName || 'Loading...'"></div>
+  <div class="header-gp" x-show="currentGp" x-text="currentGp ? currentGp.toLocaleString() + ' GP' : ''"></div>
+</div>
+
+<div class="container">
+
+  <!-- Unit names warning -->
+  <div class="unit-names-warn" x-show="unitNamesCount === 0 && !syncingNames">
+    <span>⚠️ Unit names not loaded yet — unit IDs will be shown instead of names.</span>
+    <button class="btn-sync" @click="syncUnitNames()" :disabled="syncingNames">Load Unit Names</button>
+  </div>
+  <div class="unit-names-warn" x-show="syncingNames" style="justify-content: center;">
+    <span class="spinner"></span>
+    <span style="margin-left:8px">Syncing unit names from comlink...</span>
+  </div>
+
+  <!-- Roster Changes -->
+  <div class="section">
+    <div class="section-title">Roster Changes</div>
+
+    <div class="date-nav">
+      <button class="btn-nav" @click="prevDate()" :disabled="dateIndex >= availableDates.length - 1">‹</button>
+      <select x-model="selectedDate" @change="loadChanges()">
+        <template x-for="d in availableDates" :key="d">
+          <option :value="d" x-text="formatDate(d)"></option>
+        </template>
+      </select>
+      <button class="btn-nav" @click="nextDate()" :disabled="dateIndex <= 0">›</button>
+      <span x-show="changesData.prev_date" style="font-size:12px;color:#64748b" x-text="changesData.prev_date ? 'vs ' + formatDate(changesData.prev_date) : ''"></span>
+    </div>
+
+    <div x-show="loadingChanges" class="loading">
+      <div style="display:inline-flex;align-items:center;gap:8px"><div class="spinner"></div> Loading...</div>
+    </div>
+
+    <div x-show="!loadingChanges && changesData.changes && changesData.changes.length === 0" class="empty-changes">
+      No changes found for this day
+    </div>
+
+    <div x-show="!loadingChanges && !changesData.prev_date && availableDates.length > 0" class="empty-changes">
+      No previous snapshot to compare with
+    </div>
+
+    <div class="changes-list" x-show="!loadingChanges && changesData.changes && changesData.changes.length > 0">
+      <template x-for="change in changesData.changes" :key="change.unit_id">
+        <div class="change-row">
+          <!-- New unit -->
+          <template x-if="change.type === 'new'">
+            <div style="display:contents">
+              <div class="change-icon" x-text="change.combat_type === 2 ? '🚀' : '🆕'"></div>
+              <div class="change-name">
+                <span x-text="change.name"></span>
+                <small x-text="change.combat_type === 2 ? 'Ship' : 'Character'"></small>
+              </div>
+              <div class="change-detail">
+                <span class="new-badge">NEW</span>
+                <span class="stars" x-text="'★'.repeat(change.stars)"></span>
+                <span x-show="change.relic_tier >= 2" class="relic-badge" x-text="'R' + (change.relic_tier - 1)"></span>
+              </div>
+            </div>
+          </template>
+          <!-- Upgrade -->
+          <template x-if="change.type === 'upgrade'">
+            <div style="display:contents">
+              <div class="change-icon" x-text="getUpgradeIcon(change)"></div>
+              <div class="change-name">
+                <span x-text="change.name"></span>
+                <small x-text="change.combat_type === 2 ? 'Ship' : 'Character'"></small>
+              </div>
+              <div class="change-detail" style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+                <template x-for="c in change.changes" :key="c.field">
+                  <div>
+                    <span x-text="formatChangeLabel(c)"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- GP History Chart -->
+  <div class="section" x-show="historyLoaded">
+    <div class="section-title">GP History</div>
+    <div class="chart-wrap">
+      <canvas id="gpChart" height="200"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function playerApp() {
+  return {
+    playerId: null,
+    playerName: '',
+    currentGp: 0,
+    availableDates: [],
+    selectedDate: null,
+    dateIndex: 0,
+    changesData: { date: null, prev_date: null, changes: [] },
+    loadingChanges: false,
+    historyLoaded: false,
+    unitNamesCount: null,
+    syncingNames: false,
+    gpChart: null,
+
+    async init() {
+      const params = new URLSearchParams(window.location.search);
+      this.playerId = params.get('id');
+      const name = params.get('name');
+      if (name) this.playerName = decodeURIComponent(name);
+
+      if (!this.playerId) {
+        window.location.href = '/';
+        return;
+      }
+
+      // Check unit names
+      const statusR = await fetch('/api/admin/unit_names_status');
+      if (statusR.ok) {
+        const s = await statusR.json();
+        this.unitNamesCount = s.count;
+      }
+
+      // Load available dates
+      const datesR = await fetch(`/api/friends/roster_dates/${this.playerId}`);
+      if (datesR.status === 401) { window.location.href = '/login'; return; }
+      if (datesR.ok) {
+        this.availableDates = await datesR.json();
+        if (this.availableDates.length > 0) {
+          this.selectedDate = this.availableDates[0];
+          this.dateIndex = 0;
+          await this.loadChanges();
+        }
+      }
+
+      // Load GP history for chart
+      await this.loadHistory();
+    },
+
+    async loadChanges() {
+      if (!this.selectedDate) return;
+      this.loadingChanges = true;
+      this.dateIndex = this.availableDates.indexOf(this.selectedDate);
+      try {
+        const r = await fetch(`/api/friends/roster_changes/${this.playerId}?date=${this.selectedDate}`);
+        if (r.status === 401) { window.location.href = '/login'; return; }
+        this.changesData = await r.json();
+      } catch(e) { console.error(e); }
+      finally { this.loadingChanges = false; }
+    },
+
+    prevDate() {
+      if (this.dateIndex < this.availableDates.length - 1) {
+        this.dateIndex++;
+        this.selectedDate = this.availableDates[this.dateIndex];
+        this.loadChanges();
+      }
+    },
+
+    nextDate() {
+      if (this.dateIndex > 0) {
+        this.dateIndex--;
+        this.selectedDate = this.availableDates[this.dateIndex];
+        this.loadChanges();
+      }
+    },
+
+    async loadHistory() {
+      try {
+        const r = await fetch('/api/friends/history');
+        if (!r.ok) return;
+        const allPlayers = await r.json();
+        const player = allPlayers.find(p => p.history && p.history.length > 0 && p.name === this.playerName);
+        if (!player) return;
+
+        const labels = player.history.map(h => h.date);
+        const data = player.history.map(h => h.gp);
+
+        this.currentGp = data[data.length - 1] || 0;
+        this.historyLoaded = true;
+
+        await this.$nextTick();
+        const ctx = document.getElementById('gpChart');
+        if (!ctx) return;
+        if (this.gpChart) this.gpChart.destroy();
+        this.gpChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: this.playerName,
+              data,
+              borderColor: '#7c3aed',
+              backgroundColor: 'rgba(124,58,237,0.1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.3,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: ctx => ctx.parsed.y.toLocaleString() + ' GP'
+                }
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: '#64748b', font: { size: 11 }, maxTicksLimit: 8 },
+                grid: { color: '#1e2235' }
+              },
+              y: {
+                ticks: {
+                  color: '#64748b',
+                  font: { size: 11 },
+                  callback: v => (v / 1000000).toFixed(1) + 'M'
+                },
+                grid: { color: '#1e2235' }
+              }
+            }
+          }
+        });
+      } catch(e) { console.error(e); }
+    },
+
+    async syncUnitNames() {
+      this.syncingNames = true;
+      try {
+        const r = await fetch('/api/admin/sync_unit_names', { method: 'POST' });
+        if (r.ok) {
+          const data = await r.json();
+          this.unitNamesCount = data.count;
+          // Reload changes to show proper names
+          if (this.selectedDate) await this.loadChanges();
+        }
+      } catch(e) { console.error(e); }
+      finally { this.syncingNames = false; }
+    },
+
+    formatDate(d) {
+      if (!d) return '';
+      const [y, m, day] = d.split('-');
+      return `${day}.${m}.${y}`;
+    },
+
+    getUpgradeIcon(change) {
+      const fields = change.changes.map(c => c.field);
+      if (fields.includes('relic_tier')) return '🔧';
+      if (fields.includes('gear_tier')) return '⚙️';
+      if (fields.includes('stars')) return '⭐';
+      if (fields.includes('level')) return '📈';
+      return '✨';
+    },
+
+    formatChangeLabel(c) {
+      if (c.field === 'stars') return `${c.from}★ → ${c.to}★`;
+      if (c.field === 'level') return `Lvl ${c.from} → ${c.to}`;
+      if (c.field === 'gear_tier') return `G${c.from} → G${c.to}`;
+      if (c.field === 'relic_tier') {
+        const fromR = c.from <= 1 ? 'G13' : `R${c.from - 1}`;
+        const toR = `R${c.to - 1}`;
+        return `${fromR} → ${toR}`;
+      }
+      return `${c.field}: ${c.from} → ${c.to}`;
+    },
+  }
+}
+</script>
+</body>
+</html>

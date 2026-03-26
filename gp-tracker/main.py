@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, FileResponse as Fa
 import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements
+from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements, save_roster_snapshot, save_unit_names, get_unit_names_count, get_roster_dates, get_roster_changes
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
@@ -50,6 +50,27 @@ collection_status = {
     "total": 0,
 }
 
+def extract_roster_units(pdata: dict) -> list:
+    """Extract minimal roster data from comlink player response."""
+    units = []
+    for unit in pdata.get("rosterUnit", []):
+        def_id = unit.get("definitionId", "")
+        # definitionId format: "DARTHREVAN:SEVEN_STAR" — take only part before ":"
+        unit_id = def_id.split(":")[0] if ":" in def_id else def_id
+        if not unit_id:
+            continue
+        relic_data = unit.get("relic", {})
+        relic_tier = relic_data.get("currentTier", -1) if relic_data else -1
+        units.append({
+            "unit_id": unit_id,
+            "level": unit.get("currentLevel", 1),
+            "gear_tier": unit.get("currentTier", 1),
+            "relic_tier": relic_tier if relic_tier is not None else -1,
+            "stars": unit.get("currentStars", 1),
+            "combat_type": unit.get("combatType", 1),
+        })
+    return units
+
 async def fetch_player_by_allycode(client, ally_code: str, fallback_name: str):
     try:
         pr = await client.post(f"{COMLINK_URL}/player", json={
@@ -65,6 +86,10 @@ async def fetch_player_by_allycode(client, ally_code: str, fallback_name: str):
                 break
         name = pdata.get("name") or fallback_name
         player_id = pdata.get("playerId") or ally_code
+        # Save roster snapshot
+        units = extract_roster_units(pdata)
+        if units:
+            save_roster_snapshot(player_id, str(date.today()), units)
         return {"id": player_id, "name": name, "gp": total_gp}
     except Exception as e:
         print(f"  Error fetching {fallback_name}: {e}")
@@ -261,3 +286,97 @@ async def collect(request: Request, auth: bool = Depends(check_auth)):
         raise HTTPException(status_code=401, detail="Wrong password")
     asyncio.create_task(fetch_all())
     return {"status": "started"}
+
+async def fetch_and_cache_unit_names():
+    """Fetch unit names from comlink and cache in DB. Called once manually."""
+    print("Fetching unit names from comlink...")
+    async with httpx.AsyncClient(timeout=120) as client:
+        try:
+            # Step 1: Get unit definitions
+            r = await client.post(f"{COMLINK_URL}/data", json={
+                "payload": {
+                    "collection": "unitsList",
+                    "match": {}
+                },
+                "enums": False
+            })
+            r.raise_for_status()
+            units_list = r.json()
+            print(f"  Got {len(units_list)} units from unitsList")
+
+            # Build baseId -> {nameKey, combatType} map
+            unit_map = {}
+            for u in units_list:
+                base_id = u.get("baseId") or u.get("id", "")
+                name_key = u.get("nameKey", "")
+                combat_type = u.get("combatType", 1)
+                if base_id and name_key:
+                    unit_map[base_id] = {"nameKey": name_key, "combat_type": combat_type}
+
+            # Step 2: Get localization
+            loc_r = await client.post(f"{COMLINK_URL}/localization", json={
+                "payload": {"id": "Loc_ENG_US.txt"},
+                "unzip": True
+            })
+            loc_r.raise_for_status()
+            loc_data = loc_r.json()
+            # localization is returned as {"localizationBundle": "KEY\tVALUE\nKEY\tVALUE\n..."}
+            loc_bundle = loc_data.get("localizationBundle", "")
+            loc_map = {}
+            for line in loc_bundle.split("\n"):
+                if "\t" in line:
+                    parts = line.split("\t", 1)
+                    if len(parts) == 2:
+                        loc_map[parts[0].strip()] = parts[1].strip()
+
+            print(f"  Got {len(loc_map)} localization strings")
+
+            # Step 3: Build final map
+            names_to_save = {}
+            for base_id, data in unit_map.items():
+                name_key = data["nameKey"]
+                human_name = loc_map.get(name_key, "")
+                if not human_name:
+                    # Try common patterns
+                    human_name = loc_map.get(f"UNIT_{base_id}_NAME", base_id)
+                names_to_save[base_id] = {
+                    "name": human_name or base_id,
+                    "combat_type": data["combat_type"]
+                }
+
+            save_unit_names(names_to_save)
+            print(f"  Cached {len(names_to_save)} unit names")
+            return len(names_to_save)
+        except Exception as e:
+            print(f"  Error fetching unit names: {e}")
+            raise
+
+@app.get("/player/{player_slug}")
+async def player_page(player_slug: str, request: Request):
+    token = request.cookies.get("auth_token", "")
+    if not SITE_PASSWORD or not secrets.compare_digest(token, SITE_PASSWORD):
+        return RedirectResponse(url="/login")
+    return FileResponse("static/player.html")
+
+@app.get("/api/friends/roster_changes/{player_id}")
+async def roster_changes(player_id: str, date: str = None, auth: bool = Depends(check_auth)):
+    return get_roster_changes(player_id, date)
+
+@app.get("/api/friends/roster_dates/{player_id}")
+async def roster_dates(player_id: str, auth: bool = Depends(check_auth)):
+    return get_roster_dates(player_id)
+
+@app.post("/api/admin/sync_unit_names")
+async def sync_unit_names(request: Request, auth: bool = Depends(check_auth)):
+    """Manually trigger unit names sync from comlink."""
+    count = await fetch_and_cache_unit_names()
+    return {"status": "ok", "count": count}
+
+@app.get("/api/admin/unit_names_status")
+async def unit_names_status(auth: bool = Depends(check_auth)):
+    return {"count": get_unit_names_count()}
+
+@app.get("/api/friends/list")
+async def friends_list(auth: bool = Depends(check_auth)):
+    """Return friends list with ally codes for player page routing."""
+    return [{"allyCode": f["allyCode"], "name": f["name"]} for f in FRIENDS]

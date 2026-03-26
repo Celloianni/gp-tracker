@@ -25,6 +25,26 @@ def init_db():
                 UNIQUE(snapshot_date, guild_id, player_id)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS roster_snapshots (
+                snapshot_date TEXT NOT NULL,
+                player_id TEXT NOT NULL,
+                unit_id TEXT NOT NULL,
+                current_level INTEGER NOT NULL DEFAULT 1,
+                gear_tier INTEGER NOT NULL DEFAULT 1,
+                relic_tier INTEGER NOT NULL DEFAULT -1,
+                current_stars INTEGER NOT NULL DEFAULT 1,
+                combat_type INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (snapshot_date, player_id, unit_id)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS unit_names (
+                unit_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                combat_type INTEGER NOT NULL DEFAULT 1
+            )
+        """)
         conn.commit()
 
 def save_snapshot(guild_id: str, players: list):
@@ -180,6 +200,7 @@ def get_monthly_progress(guild_id: str):
             diff_rank = diff_ranks[p["id"]]
             rank_change = get_rank_change(guild_id, p["id"], diff_rank)
             players.append({
+                "id": p["id"],
                 "name": p["name"],
                 "gp": p["gp"],
                 "gp_prev": p["gp_prev"],
@@ -266,6 +287,7 @@ def get_progress_for_month(guild_id: str, month: str):
             rank = gp_ranks[p["id"]]
             rank_change = get_rank_change(guild_id, p["id"], rank)
             players.append({
+                "id": p["id"],
                 "name": p["name"],
                 "gp": p["gp"],
                 "gp_prev": p["gp_prev"],
@@ -485,3 +507,119 @@ def get_friends_history(player_ids: list):
             players[player_id]["history"].append({"date": snapshot_date, "gp": gp})
 
         return list(players.values())
+
+def save_roster_snapshot(player_id: str, snapshot_date: str, units: list):
+    """Save roster snapshot for a player. units = list of dicts with unit_id, level, gear_tier, relic_tier, stars, combat_type"""
+    with get_conn() as conn:
+        for u in units:
+            conn.execute("""
+                INSERT OR REPLACE INTO roster_snapshots
+                (snapshot_date, player_id, unit_id, current_level, gear_tier, relic_tier, current_stars, combat_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (snapshot_date, player_id, u["unit_id"], u["level"], u["gear_tier"], u["relic_tier"], u["stars"], u["combat_type"]))
+        conn.commit()
+
+def save_unit_names(units: dict):
+    """units = {unit_id: {"name": "Darth Revan", "combat_type": 1}}"""
+    with get_conn() as conn:
+        for unit_id, data in units.items():
+            conn.execute("""
+                INSERT OR REPLACE INTO unit_names (unit_id, name, combat_type)
+                VALUES (?, ?, ?)
+            """, (unit_id, data["name"], data.get("combat_type", 1)))
+        conn.commit()
+
+def get_unit_names_count() -> int:
+    with get_conn() as conn:
+        return conn.execute("SELECT COUNT(*) FROM unit_names").fetchone()[0]
+
+def get_roster_dates(player_id: str) -> list:
+    """Get all dates with roster data for a player."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT DISTINCT snapshot_date FROM roster_snapshots
+            WHERE player_id = ?
+            ORDER BY snapshot_date DESC
+        """, (player_id,)).fetchall()
+        return [r[0] for r in rows]
+
+def get_roster_changes(player_id: str, date: str = None) -> dict:
+    """Compare roster on given date vs previous date. Returns list of changes."""
+    with get_conn() as conn:
+        if date:
+            dates = [r[0] for r in conn.execute("""
+                SELECT DISTINCT snapshot_date FROM roster_snapshots
+                WHERE player_id = ? AND snapshot_date <= ?
+                ORDER BY snapshot_date DESC LIMIT 2
+            """, (player_id, date)).fetchall()]
+        else:
+            dates = [r[0] for r in conn.execute("""
+                SELECT DISTINCT snapshot_date FROM roster_snapshots
+                WHERE player_id = ?
+                ORDER BY snapshot_date DESC LIMIT 2
+            """, (player_id,)).fetchall()]
+
+        if not dates:
+            return {"date": None, "prev_date": None, "changes": []}
+
+        today = dates[0]
+        prev_date = dates[1] if len(dates) > 1 else None
+
+        today_roster = {r[0]: {"level": r[1], "gear_tier": r[2], "relic_tier": r[3], "stars": r[4], "combat_type": r[5]}
+                        for r in conn.execute("""
+                            SELECT unit_id, current_level, gear_tier, relic_tier, current_stars, combat_type
+                            FROM roster_snapshots WHERE player_id = ? AND snapshot_date = ?
+                        """, (player_id, today)).fetchall()}
+
+        prev_roster = {}
+        if prev_date:
+            prev_roster = {r[0]: {"level": r[1], "gear_tier": r[2], "relic_tier": r[3], "stars": r[4], "combat_type": r[5]}
+                           for r in conn.execute("""
+                               SELECT unit_id, current_level, gear_tier, relic_tier, current_stars, combat_type
+                               FROM roster_snapshots WHERE player_id = ? AND snapshot_date = ?
+                           """, (player_id, prev_date)).fetchall()}
+
+        unit_names = {r[0]: r[1] for r in conn.execute("SELECT unit_id, name FROM unit_names").fetchall()}
+
+        changes = []
+        for unit_id, current in today_roster.items():
+            name = unit_names.get(unit_id, unit_id)
+            if unit_id not in prev_roster:
+                changes.append({
+                    "type": "new",
+                    "unit_id": unit_id,
+                    "name": name,
+                    "stars": current["stars"],
+                    "level": current["level"],
+                    "gear_tier": current["gear_tier"],
+                    "relic_tier": current["relic_tier"],
+                    "combat_type": current["combat_type"],
+                })
+            else:
+                prev = prev_roster[unit_id]
+                unit_changes = []
+                if current["stars"] > prev["stars"]:
+                    unit_changes.append({"field": "stars", "from": prev["stars"], "to": current["stars"]})
+                if current["level"] > prev["level"]:
+                    unit_changes.append({"field": "level", "from": prev["level"], "to": current["level"]})
+                if current["gear_tier"] > prev["gear_tier"]:
+                    unit_changes.append({"field": "gear_tier", "from": prev["gear_tier"], "to": current["gear_tier"]})
+                if current["relic_tier"] > prev["relic_tier"] and current["relic_tier"] >= 2:
+                    unit_changes.append({"field": "relic_tier", "from": prev["relic_tier"], "to": current["relic_tier"]})
+                if unit_changes:
+                    changes.append({
+                        "type": "upgrade",
+                        "unit_id": unit_id,
+                        "name": name,
+                        "combat_type": current["combat_type"],
+                        "changes": unit_changes,
+                    })
+
+        # Sort: new units first, then upgrades; within each group by name
+        changes.sort(key=lambda x: (0 if x["type"] == "new" else 1, x["name"]))
+
+        return {
+            "date": today,
+            "prev_date": prev_date,
+            "changes": changes,
+        }

@@ -206,7 +206,11 @@
                 <span class="activity-dot" :style="'background:'+activityColor(p.activity)"></span>
               </td>
               <td class="name" style="white-space:nowrap;">
-                <span x-text="p.name"></span>
+                <a :href="'/player/details?id=' + p.id + '&name=' + encodeURIComponent(p.name)"
+                   style="color: inherit; text-decoration: none;"
+                   @mouseover="$el.style.color='#a78bfa'"
+                   @mouseout="$el.style.color=''"
+                   x-text="p.name"></a>
                 <template x-for="ach in (friendsAchievements[p.name] || [])" :key="ach[0]+ach[1]">
                   <span class="achievement" x-text="ach[0]" style="margin-left:4px;"><span class="tip" x-text="ach[1]"></span></span>
                 </template>
