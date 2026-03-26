@@ -121,8 +121,12 @@
               <div class="change-detail">
                 <span class="new-badge">NEW</span>
                 <span class="stars" x-text="'⭐'.repeat(change.stars || 1)"></span>
-                <span :class="gearClass(change.gear_tier)" x-text="'G' + change.gear_tier"></span>
-                <span x-show="change.relic_tier >= 3" class="relic-badge" x-text="'R' + (change.relic_tier - 2)"></span>
+                <template x-if="change.combat_type !== 2">
+                  <span x-show="change.relic_tier >= 3" class="relic-badge" x-text="'R' + (change.relic_tier - 2)"></span>
+                </template>
+                <template x-if="change.combat_type !== 2 && change.relic_tier < 3">
+                  <span :class="gearClass(change.gear_tier)" x-text="'G' + change.gear_tier"></span>
+                </template>
               </div>
             </div>
           </template>
