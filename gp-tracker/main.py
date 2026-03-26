@@ -63,7 +63,7 @@ def extract_roster_units(pdata: dict) -> tuple:
         unit_id = parts[0]
         if not unit_id:
             continue
-        stars = unit.get("currentStar") or unit.get("currentStars") or STAR_MAP.get(parts[1], 1)
+        stars = unit.get("currentRarity") or unit.get("currentStar") or unit.get("currentStars") or STAR_MAP.get(parts[1], 1)
         relic_data = unit.get("relic", {})
         relic_tier = relic_data.get("currentTier", -1) if relic_data else -1
         units.append({
@@ -414,9 +414,8 @@ async def test_unit_stat(ally_code: str, auth: bool = Depends(check_auth)):
         return {
             "definitionId": u.get("definitionId"),
             "keys": list(u.keys()),
-            "stat": u.get("stat"),
-            "combatStats": u.get("combatStats"),
-            "primaryStat": u.get("primaryStat"),
+            "currentRarity": u.get("currentRarity"),
+            "unitStat": u.get("unitStat"),
         }
 
 @app.get("/api/test/localization")
