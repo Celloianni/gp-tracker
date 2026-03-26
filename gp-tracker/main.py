@@ -67,7 +67,7 @@ def extract_roster_units(pdata: dict) -> tuple:
             "level": unit.get("currentLevel", 1),
             "gear_tier": unit.get("currentTier", 1),
             "relic_tier": relic_tier if relic_tier is not None else -1,
-            "stars": unit.get("currentStars", 1),
+            "stars": unit.get("currentStar") or unit.get("currentStars", 1),
             "combat_type": unit.get("combatType", 1),
         })
         unit_abilities = []
@@ -321,20 +321,26 @@ async def fetch_and_cache_unit_names():
 
         # Build baseId → thumbnailName map from units.json
         units_data = units_r.json()
-        thumbnail_map = {}
+        unit_meta = {}  # baseId -> {thumbnailName, combatType}
         units_list = units_data if isinstance(units_data, list) else units_data.get("data", [])
         for u in units_list:
             base_id = u.get("baseId", "").upper()
-            thumb = u.get("thumbnailName", "")
-            if base_id and thumb:
-                thumbnail_map[base_id] = thumb
-        print(f"  Loaded {len(thumbnail_map)} thumbnail names")
+            if base_id:
+                unit_meta[base_id] = {
+                    "thumbnailName": u.get("thumbnailName", ""),
+                    "combatType": u.get("combatType", 1),
+                }
+        print(f"  Loaded {len(unit_meta)} unit metadata entries")
 
         names_to_save = {}
         for unit_id in known_ids:
             name = loc_map.get(f"UNIT_{unit_id}_NAME", "") or unit_id
-            thumb = thumbnail_map.get(unit_id, "")
-            names_to_save[unit_id] = {"name": name, "combat_type": 1, "thumbnail_name": thumb}
+            meta = unit_meta.get(unit_id, {})
+            names_to_save[unit_id] = {
+                "name": name,
+                "combat_type": meta.get("combatType", 1),
+                "thumbnail_name": meta.get("thumbnailName", ""),
+            }
 
         # Also load ability names using same localization file
         ability_ids = get_all_ability_ids()

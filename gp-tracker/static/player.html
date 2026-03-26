@@ -110,11 +110,11 @@
               </div>
               <div class="change-name">
                 <span x-text="change.name"></span>
-                <small x-text="change.combat_type === 2 ? 'Ship' : 'Character'"></small>
+                <small x-text="change.combat_type === 2 ? 'Ship' : 'Character'" style="text-transform:capitalize"></small>
               </div>
               <div class="change-detail">
                 <span class="new-badge">NEW</span>
-                <span class="stars" x-text="'★'.repeat(change.stars)"></span>
+                <span class="stars" x-text="'⭐'.repeat(change.stars || 1)"></span>
                 <span x-show="change.relic_tier >= 2" class="relic-badge" x-text="'R' + (change.relic_tier - 1)"></span>
               </div>
             </div>
@@ -132,7 +132,7 @@
               </div>
               <div class="change-name">
                 <span x-text="change.name"></span>
-                <small x-text="change.combat_type === 2 ? 'Ship' : 'Character'"></small>
+                <small x-text="change.combat_type === 2 ? 'Ship' : 'Character'" style="text-transform:capitalize"></small>
               </div>
               <div class="change-detail" style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
                 <template x-for="c in change.changes" :key="c.field">

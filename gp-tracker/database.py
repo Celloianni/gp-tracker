@@ -615,7 +615,7 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
                                FROM roster_snapshots WHERE player_id = ? AND snapshot_date = ?
                            """, (player_id, prev_date)).fetchall()}
 
-        unit_data = {r[0]: {"name": r[1], "thumbnail_name": r[2]} for r in conn.execute("SELECT unit_id, name, thumbnail_name FROM unit_names").fetchall()}
+        unit_data = {r[0]: {"name": r[1], "thumbnail_name": r[2], "combat_type": r[3]} for r in conn.execute("SELECT unit_id, name, thumbnail_name, combat_type FROM unit_names").fetchall()}
         unit_names = {uid: d["name"] for uid, d in unit_data.items()}
 
         # Load abilities for both dates
@@ -637,8 +637,10 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
         changes = []
         for unit_id, current in today_roster.items():
             name = unit_names.get(unit_id, unit_id)
-            thumb = unit_data.get(unit_id, {}).get("thumbnail_name") or ""
+            ud = unit_data.get(unit_id, {})
+            thumb = ud.get("thumbnail_name") or ""
             thumbnail_url = f"https://game-assets.swgoh.gg/textures/{thumb}.png" if thumb else ""
+            combat_type = ud.get("combat_type") or current["combat_type"]
             if unit_id not in prev_roster:
                 changes.append({
                     "type": "new",
@@ -649,7 +651,7 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
                     "level": current["level"],
                     "gear_tier": current["gear_tier"],
                     "relic_tier": current["relic_tier"],
-                    "combat_type": current["combat_type"],
+                    "combat_type": combat_type,
                 })
             else:
                 prev = prev_roster[unit_id]
@@ -679,7 +681,7 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
                         "unit_id": unit_id,
                         "name": name,
                         "thumbnail_url": thumbnail_url,
-                        "combat_type": current["combat_type"],
+                        "combat_type": combat_type,
                         "changes": unit_changes,
                     })
 
