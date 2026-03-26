@@ -239,6 +239,8 @@ def get_progress_for_month(guild_id: str, month: str):
                 (guild_id, first_date)
             ).fetchall()}
 
+        monthly_plan = int(get_setting("monthly_plan", "100000"))
+
         players_raw = []
         for pid, data in latest.items():
             gp_now = data["gp"]
@@ -250,7 +252,8 @@ def get_progress_for_month(guild_id: str, month: str):
                 "gp": gp_now,
                 "gp_prev": gp_prev,
                 "diff": diff,
-                "diff_pct": round(diff / gp_prev * 100, 2) if gp_prev > 0 else 0
+                "diff_pct": round(diff / gp_prev * 100, 2) if gp_prev > 0 else 0,
+                "plan_pct": round(diff / monthly_plan * 100, 1) if monthly_plan > 0 else 0,
             })
 
         players_raw.sort(key=lambda x: x["gp"], reverse=True)
@@ -268,6 +271,7 @@ def get_progress_for_month(guild_id: str, month: str):
                 "gp_prev": p["gp_prev"],
                 "diff": p["diff"],
                 "diff_pct": p["diff_pct"],
+                "plan_pct": p["plan_pct"],
                 "streak": streak,
                 "activity": activity,
                 "rank": rank,
