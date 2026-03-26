@@ -369,8 +369,14 @@ async def roster_dates(player_id: str, auth: bool = Depends(check_auth)):
 @app.post("/api/admin/sync_unit_names")
 async def sync_unit_names(request: Request, auth: bool = Depends(check_auth)):
     """Manually trigger unit names sync from comlink."""
-    count = await fetch_and_cache_unit_names()
-    return {"status": "ok", "count": count}
+    try:
+        count = await fetch_and_cache_unit_names()
+        return {"status": "ok", "count": count}
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(f"sync_unit_names error:\n{tb}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/admin/unit_names_status")
 async def unit_names_status(auth: bool = Depends(check_auth)):
