@@ -409,9 +409,15 @@ function tracker() {
     async loadGuild(id, showLoading = true) {
       if (showLoading) this.loadingGuild = true;
       try {
-        const r = await fetch(`/api/progress/${id}`);
+        const progUrl = this.guildMonth
+          ? `/api/progress/${id}?month=${this.guildMonth}`
+          : `/api/progress/${id}`;
+        const requests = [fetch(progUrl)];
+        if (showLoading) requests.push(fetch(`/api/months/${id}`));
+        const [r, monthsR] = await Promise.all(requests);
         if (r.status === 401) { window.location.href = '/login'; return; }
         this.guildData = await r.json();
+        if (monthsR) this.guildMonths = await monthsR.json();
       } catch(e) { console.error(e); }
       finally { if (showLoading) this.loadingGuild = false; }
     },
