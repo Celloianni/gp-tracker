@@ -369,23 +369,23 @@ async def unit_names_status(auth: bool = Depends(check_auth)):
 
 @app.get("/api/test/localization")
 async def test_localization(auth: bool = Depends(check_auth)):
-    """Test localization using version from metadata."""
+    """Test swgoh.gg API for unit names."""
     results = {}
-    async with httpx.AsyncClient(timeout=60) as client:
-        # Step 1: get version from metadata
-        meta_r = await client.post(f"{COMLINK_URL}/metadata", json={"payload": {}})
-        meta = meta_r.json()
-        loc_version = meta.get("latestLocalizationBundleVersion", "")
-        results["loc_version"] = loc_version
-        # Step 2: try localization with real version id
-        for id_val in [loc_version, f"Loc_ENG_US.txt_{loc_version}", loc_version + ":ENG_US"]:
-            if not id_val:
-                continue
-            try:
-                r = await client.post(f"{COMLINK_URL}/localization", json={"payload": {"id": id_val}})
-                results[f"loc_{id_val[:30]}"] = {"status": r.status_code, "body_preview": r.text[:300]}
-            except Exception as e:
-                results[f"loc_{id_val[:30]}"] = {"error": str(e)}
+    async with httpx.AsyncClient(timeout=30) as client:
+        try:
+            r = await client.get("https://swgoh.gg/api/characters/")
+            chars = r.json()
+            sample = chars[:3] if isinstance(chars, list) else chars
+            results["characters"] = {"status": r.status_code, "count": len(chars) if isinstance(chars, list) else "?", "sample": sample}
+        except Exception as e:
+            results["characters"] = {"error": str(e)}
+        try:
+            r = await client.get("https://swgoh.gg/api/ships/")
+            ships = r.json()
+            sample = ships[:3] if isinstance(ships, list) else ships
+            results["ships"] = {"status": r.status_code, "count": len(ships) if isinstance(ships, list) else "?", "sample": sample}
+        except Exception as e:
+            results["ships"] = {"error": str(e)}
     return results
 
 @app.get("/api/friends/list")
