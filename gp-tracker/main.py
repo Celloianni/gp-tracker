@@ -298,7 +298,7 @@ async def fetch_and_cache_unit_names():
     async with httpx.AsyncClient(timeout=120) as client:
         r = await client.get(LOC_URL)
         r.raise_for_status()
-        loc_map = r.json()  # flat dict: {"UNIT_HANSOLO_NAME": "Han Solo", ...}
+        loc_map = r.json().get("data", {})  # {"version": "...", "data": {"UNIT_HANSOLO_NAME": "Han Solo", ...}}
         print(f"  Loaded {len(loc_map)} localization strings")
 
         names_to_save = {}
