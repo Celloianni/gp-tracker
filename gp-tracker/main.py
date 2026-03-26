@@ -288,41 +288,18 @@ async def collect(request: Request, auth: bool = Depends(check_auth)):
     return {"status": "started"}
 
 async def fetch_and_cache_unit_names():
-    """Fetch unit names from comlink localization and cache in DB."""
-    import base64, zipfile, io as _io
-    print("Fetching unit names from comlink localization...")
+    """Fetch unit names from swgoh-utils gamedata on GitHub and cache in DB."""
+    LOC_URL = "https://raw.githubusercontent.com/swgoh-utils/gamedata/main/Loc_ENG_US.txt.json"
+    print("Fetching unit names from swgoh-utils/gamedata GitHub...")
 
-    # Get all unit IDs we already have in DB
     known_ids = get_all_unit_ids()
     print(f"  Found {len(known_ids)} unique unit IDs in roster snapshots")
 
     async with httpx.AsyncClient(timeout=120) as client:
-        loc_r = await client.post(f"{COMLINK_URL}/localization", json={
-            "payload": {"id": "Loc_ENG_US.txt"}
-        })
-        loc_r.raise_for_status()
-        loc_data = loc_r.json()
-        raw = loc_data.get("localizationBundle", "")
-
-        # Bundle may be plain text or base64-encoded zip
-        loc_text = ""
-        try:
-            decoded = base64.b64decode(raw)
-            with zipfile.ZipFile(_io.BytesIO(decoded)) as zf:
-                for fname in zf.namelist():
-                    loc_text += zf.read(fname).decode("utf-8")
-            print("  Decoded localization as base64 zip")
-        except Exception:
-            loc_text = raw
-            print("  Using localization as plain text")
-
-        loc_map = {}
-        for line in loc_text.split("\n"):
-            if "\t" in line:
-                parts = line.split("\t", 1)
-                if len(parts) == 2:
-                    loc_map[parts[0].strip()] = parts[1].strip()
-        print(f"  Parsed {len(loc_map)} localization strings")
+        r = await client.get(LOC_URL)
+        r.raise_for_status()
+        loc_map = r.json()  # flat dict: {"UNIT_HANSOLO_NAME": "Han Solo", ...}
+        print(f"  Loaded {len(loc_map)} localization strings")
 
         names_to_save = {}
         for unit_id in known_ids:
