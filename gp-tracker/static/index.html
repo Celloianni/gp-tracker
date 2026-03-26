@@ -213,7 +213,11 @@
               </td>
               <td class="gp" x-text="fmt(p.gp)"></td>
               <td class="diff" :class="p.diff>0?'pos':p.diff<0?'neg':'zero'" x-text="(p.diff>0?'+':'')+fmt(p.diff)"></td>
-              <td :class="p.streak>0?'streak-pos':p.streak<0?'streak-neg':'streak-zero'" x-text="p.streak>0?'+'+p.streak+' days':p.streak<0?p.streak+' days':'—'"></td>
+              <td :class="p.streak>0?'streak-pos':p.streak<0?'streak-neg':'streak-zero'" style="white-space:nowrap;">
+                <span x-text="p.streak>0?'+'+p.streak+' days':p.streak<0?p.streak+' days':'—'"></span>
+                <template x-if="p.streak >= 7"><span class="achievement" style="margin-left:3px;">🔥<span class="tip">Стрік +7 днів поспіль!</span></span></template>
+                <template x-if="p.streak <= -3"><span class="achievement" style="margin-left:3px;">🥶<span class="tip">Стрік -3 дні і нижче</span></span></template>
+              </td>
               <td><span :class="planPctClass(p.plan_pct)" x-text="p.plan_pct > 0 ? p.plan_pct + '%' : '—'"></span></td>
             </tr>
           </template>
@@ -350,10 +354,18 @@ function tracker() {
     progressLabel: 'Starting...',
 
     async init() {
-      const r = await fetch('/api/guilds');
-      this.guilds = await r.json();
+      const [guildsR, settingsR, monthsR] = await Promise.all([
+        fetch('/api/guilds'),
+        fetch('/api/settings'),
+        fetch('/api/months/friends')
+      ]);
+      if (guildsR.status === 401) { window.location.href = '/login'; return; }
+      this.guilds = await guildsR.json();
+      const settings = await settingsR.json();
+      this.monthlyPlan = settings.monthly_plan;
+      this.planInput = settings.monthly_plan;
+      this.friendsMonths = await monthsR.json();
       await this.loadFriends();
-
     },
 
     async autoRefresh() {
@@ -376,14 +388,19 @@ function tracker() {
     async loadFriends(showLoading = true) {
       if (showLoading) this.loadingFriends = true;
       try {
-        const [progR, histR] = await Promise.all([
-          fetch('/api/progress/friends'),
-          fetch('/api/friends/history')
+        const progUrl = this.friendsMonth
+          ? `/api/progress/friends?month=${this.friendsMonth}`
+          : '/api/progress/friends';
+        const [progR, histR, achR] = await Promise.all([
+          fetch(progUrl),
+          fetch('/api/friends/history'),
+          fetch('/api/friends/achievements')
         ]);
         if (progR.status === 401) { window.location.href = '/login'; return; }
-        const [prog, hist] = await Promise.all([progR.json(), histR.json()]);
+        const [prog, hist, ach] = await Promise.all([progR.json(), histR.json(), achR.json()]);
         this.friendsData = prog;
         this.friendsHistory = hist;
+        this.friendsAchievements = ach;
         this.$nextTick(() => this.renderChart());
       } catch(e) { console.error(e); }
       finally { if (showLoading) this.loadingFriends = false; }
