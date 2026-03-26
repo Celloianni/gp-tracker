@@ -37,7 +37,13 @@
   .loading { text-align: center; padding: 60px; color: #64748b; }
   .stars { color: #fbbf24; font-size: 12px; }
   .relic-badge { background: #1e1b4b; color: #a78bfa; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
-  .gear-badge { background: #1c2d1e; color: #4ade80; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+  .gear-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+  .gear-g1  { background: #1f2937; color: #9ca3af; }
+  .gear-g24 { background: #052e16; color: #86efac; }
+  .gear-g57 { background: #0c1a3a; color: #93c5fd; }
+  .gear-g811{ background: #2e1065; color: #c4b5fd; }
+  .gear-g12 { background: #422006; color: #fcd34d; }
+  .gear-g13 { background: #422006; color: #fcd34d; }
   .type-badge { font-size: 11px; color: #64748b; }
   .unit-names-warn { background: #1c1410; border: 1px solid #92400e; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #fbbf24; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .btn-sync { background: #7c3aed; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
@@ -115,6 +121,7 @@
               <div class="change-detail">
                 <span class="new-badge">NEW</span>
                 <span class="stars" x-text="'⭐'.repeat(change.stars || 1)"></span>
+                <span :class="gearClass(change.gear_tier)" x-text="'G' + change.gear_tier"></span>
                 <span x-show="change.relic_tier >= 3" class="relic-badge" x-text="'R' + (change.relic_tier - 2)"></span>
               </div>
             </div>
@@ -311,6 +318,15 @@ function playerApp() {
         }
       } catch(e) { console.error(e); }
       finally { this.syncingNames = false; }
+    },
+
+    gearClass(g) {
+      if (g >= 13) return 'gear-badge gear-g13';
+      if (g >= 12) return 'gear-badge gear-g12';
+      if (g >= 8)  return 'gear-badge gear-g811';
+      if (g >= 5)  return 'gear-badge gear-g57';
+      if (g >= 2)  return 'gear-badge gear-g24';
+      return 'gear-badge gear-g1';
     },
 
     formatDate(d) {
