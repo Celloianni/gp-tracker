@@ -369,27 +369,23 @@ async def unit_names_status(auth: bool = Depends(check_auth)):
 
 @app.get("/api/test/localization")
 async def test_localization(auth: bool = Depends(check_auth)):
-    """Test what localization formats comlink accepts."""
+    """Test localization and metadata endpoints."""
     results = {}
     async with httpx.AsyncClient(timeout=30) as client:
-        # Try 1: payload wrapper
+        # Check metadata to find correct localization ID
         try:
-            r = await client.post(f"{COMLINK_URL}/localization", json={"payload": {"id": "Loc_ENG_US.txt"}})
-            results["with_payload"] = {"status": r.status_code, "body_preview": r.text[:200]}
+            r = await client.post(f"{COMLINK_URL}/metadata", json={"payload": {}})
+            meta = r.json()
+            results["metadata"] = {"status": r.status_code, "keys": list(meta.keys())[:20], "preview": str(meta)[:500]}
         except Exception as e:
-            results["with_payload"] = {"error": str(e)}
-        # Try 2: no wrapper
-        try:
-            r = await client.post(f"{COMLINK_URL}/localization", json={"id": "Loc_ENG_US.txt"})
-            results["no_wrapper"] = {"status": r.status_code, "body_preview": r.text[:200]}
-        except Exception as e:
-            results["no_wrapper"] = {"error": str(e)}
-        # Try 3: GET
-        try:
-            r = await client.get(f"{COMLINK_URL}/localization/ENG_US")
-            results["get_eng_us"] = {"status": r.status_code, "body_preview": r.text[:200]}
-        except Exception as e:
-            results["get_eng_us"] = {"error": str(e)}
+            results["metadata"] = {"error": str(e)}
+        # Try localization with different id formats
+        for id_val in ["Loc_ENG_US.txt", "ENG_US", "eng_us"]:
+            try:
+                r = await client.post(f"{COMLINK_URL}/localization", json={"payload": {"id": id_val}})
+                results[f"loc_{id_val}"] = {"status": r.status_code, "body_preview": r.text[:300]}
+            except Exception as e:
+                results[f"loc_{id_val}"] = {"error": str(e)}
     return results
 
 @app.get("/api/friends/list")
