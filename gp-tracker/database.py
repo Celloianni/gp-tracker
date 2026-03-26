@@ -533,6 +533,12 @@ def get_unit_names_count() -> int:
     with get_conn() as conn:
         return conn.execute("SELECT COUNT(*) FROM unit_names").fetchone()[0]
 
+def get_all_unit_ids() -> list:
+    """Get all unique unit IDs stored in roster_snapshots."""
+    with get_conn() as conn:
+        rows = conn.execute("SELECT DISTINCT unit_id FROM roster_snapshots").fetchall()
+        return [r[0] for r in rows]
+
 def get_roster_dates(player_id: str) -> list:
     """Get all dates with roster data for a player."""
     with get_conn() as conn:

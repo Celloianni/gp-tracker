@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, FileResponse as Fa
 import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements, save_roster_snapshot, save_unit_names, get_unit_names_count, get_roster_dates, get_roster_changes
+from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements, save_roster_snapshot, save_unit_names, get_unit_names_count, get_all_unit_ids, get_roster_dates, get_roster_changes
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
@@ -288,68 +288,53 @@ async def collect(request: Request, auth: bool = Depends(check_auth)):
     return {"status": "started"}
 
 async def fetch_and_cache_unit_names():
-    """Fetch unit names from comlink and cache in DB. Called once manually."""
-    print("Fetching unit names from comlink...")
+    """Fetch unit names from comlink localization and cache in DB."""
+    import base64, zipfile, io as _io
+    print("Fetching unit names from comlink localization...")
+
+    # Get all unit IDs we already have in DB
+    known_ids = get_all_unit_ids()
+    print(f"  Found {len(known_ids)} unique unit IDs in roster snapshots")
+
     async with httpx.AsyncClient(timeout=120) as client:
+        loc_r = await client.post(f"{COMLINK_URL}/localization", json={
+            "payload": {"id": "Loc_ENG_US.txt"}
+        })
+        loc_r.raise_for_status()
+        loc_data = loc_r.json()
+        raw = loc_data.get("localizationBundle", "")
+
+        # Bundle may be plain text or base64-encoded zip
+        loc_text = ""
         try:
-            # Step 1: Get unit definitions
-            r = await client.post(f"{COMLINK_URL}/data", json={
-                "payload": {
-                    "collection": "unitsList",
-                    "match": {}
-                },
-                "enums": False
-            })
-            r.raise_for_status()
-            units_list = r.json()
-            print(f"  Got {len(units_list)} units from unitsList")
+            decoded = base64.b64decode(raw)
+            with zipfile.ZipFile(_io.BytesIO(decoded)) as zf:
+                for fname in zf.namelist():
+                    loc_text += zf.read(fname).decode("utf-8")
+            print("  Decoded localization as base64 zip")
+        except Exception:
+            loc_text = raw
+            print("  Using localization as plain text")
 
-            # Build baseId -> {nameKey, combatType} map
-            unit_map = {}
-            for u in units_list:
-                base_id = u.get("baseId") or u.get("id", "")
-                name_key = u.get("nameKey", "")
-                combat_type = u.get("combatType", 1)
-                if base_id and name_key:
-                    unit_map[base_id] = {"nameKey": name_key, "combat_type": combat_type}
+        loc_map = {}
+        for line in loc_text.split("\n"):
+            if "\t" in line:
+                parts = line.split("\t", 1)
+                if len(parts) == 2:
+                    loc_map[parts[0].strip()] = parts[1].strip()
+        print(f"  Parsed {len(loc_map)} localization strings")
 
-            # Step 2: Get localization
-            loc_r = await client.post(f"{COMLINK_URL}/localization", json={
-                "payload": {"id": "Loc_ENG_US.txt"},
-                "unzip": True
-            })
-            loc_r.raise_for_status()
-            loc_data = loc_r.json()
-            # localization is returned as {"localizationBundle": "KEY\tVALUE\nKEY\tVALUE\n..."}
-            loc_bundle = loc_data.get("localizationBundle", "")
-            loc_map = {}
-            for line in loc_bundle.split("\n"):
-                if "\t" in line:
-                    parts = line.split("\t", 1)
-                    if len(parts) == 2:
-                        loc_map[parts[0].strip()] = parts[1].strip()
+        names_to_save = {}
+        for unit_id in known_ids:
+            name = loc_map.get(f"UNIT_{unit_id}_NAME", "")
+            names_to_save[unit_id] = {
+                "name": name if name else unit_id,
+                "combat_type": 1
+            }
 
-            print(f"  Got {len(loc_map)} localization strings")
-
-            # Step 3: Build final map
-            names_to_save = {}
-            for base_id, data in unit_map.items():
-                name_key = data["nameKey"]
-                human_name = loc_map.get(name_key, "")
-                if not human_name:
-                    # Try common patterns
-                    human_name = loc_map.get(f"UNIT_{base_id}_NAME", base_id)
-                names_to_save[base_id] = {
-                    "name": human_name or base_id,
-                    "combat_type": data["combat_type"]
-                }
-
-            save_unit_names(names_to_save)
-            print(f"  Cached {len(names_to_save)} unit names")
-            return len(names_to_save)
-        except Exception as e:
-            print(f"  Error fetching unit names: {e}")
-            raise
+        save_unit_names(names_to_save)
+        print(f"  Cached {len(names_to_save)} unit names")
+        return len(names_to_save)
 
 @app.get("/player/{player_slug}")
 async def player_page(player_slug: str, request: Request):
