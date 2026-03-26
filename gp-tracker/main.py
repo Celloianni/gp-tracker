@@ -55,11 +55,15 @@ def extract_roster_units(pdata: dict) -> tuple:
     Returns (units, abilities) where abilities = {unit_id: [{id, tier, is_zeta}]}"""
     units = []
     abilities = {}
+    STAR_MAP = {"ONE_STAR": 1, "TWO_STAR": 2, "THREE_STAR": 3, "FOUR_STAR": 4,
+                "FIVE_STAR": 5, "SIX_STAR": 6, "SEVEN_STAR": 7}
     for unit in pdata.get("rosterUnit", []):
         def_id = unit.get("definitionId", "")
-        unit_id = def_id.split(":")[0] if ":" in def_id else def_id
+        parts = def_id.split(":") if ":" in def_id else [def_id, ""]
+        unit_id = parts[0]
         if not unit_id:
             continue
+        stars = unit.get("currentStar") or unit.get("currentStars") or STAR_MAP.get(parts[1], 1)
         relic_data = unit.get("relic", {})
         relic_tier = relic_data.get("currentTier", -1) if relic_data else -1
         units.append({
@@ -67,7 +71,7 @@ def extract_roster_units(pdata: dict) -> tuple:
             "level": unit.get("currentLevel", 1),
             "gear_tier": unit.get("currentTier", 1),
             "relic_tier": relic_tier if relic_tier is not None else -1,
-            "stars": unit.get("currentStar") or unit.get("currentStars", 1),
+            "stars": stars,
             "combat_type": unit.get("combatType", 1),
         })
         unit_abilities = []
