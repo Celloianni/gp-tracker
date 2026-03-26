@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, FileResponse as Fa
 import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements, save_roster_snapshot, save_unit_names, get_unit_names_count, get_all_unit_ids, get_roster_dates, get_roster_changes
+from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements, save_roster_snapshot, save_unit_names, get_unit_names_count, get_all_unit_ids, get_all_ability_ids, get_roster_dates, get_roster_changes
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
@@ -50,12 +50,13 @@ collection_status = {
     "total": 0,
 }
 
-def extract_roster_units(pdata: dict) -> list:
-    """Extract minimal roster data from comlink player response."""
+def extract_roster_units(pdata: dict) -> tuple:
+    """Extract roster data from comlink player response.
+    Returns (units, abilities) where abilities = {unit_id: [{id, tier, is_zeta}]}"""
     units = []
+    abilities = {}
     for unit in pdata.get("rosterUnit", []):
         def_id = unit.get("definitionId", "")
-        # definitionId format: "DARTHREVAN:SEVEN_STAR" — take only part before ":"
         unit_id = def_id.split(":")[0] if ":" in def_id else def_id
         if not unit_id:
             continue
@@ -69,7 +70,18 @@ def extract_roster_units(pdata: dict) -> list:
             "stars": unit.get("currentStars", 1),
             "combat_type": unit.get("combatType", 1),
         })
-    return units
+        unit_abilities = []
+        for skill in unit.get("skill", []):
+            skill_id = skill.get("id", "")
+            if skill_id:
+                unit_abilities.append({
+                    "id": skill_id,
+                    "tier": skill.get("tier", 1),
+                    "is_zeta": 1 if skill.get("isZeta", False) else 0,
+                })
+        if unit_abilities:
+            abilities[unit_id] = unit_abilities
+    return units, abilities
 
 async def fetch_player_by_allycode(client, ally_code: str, fallback_name: str):
     try:
@@ -87,9 +99,9 @@ async def fetch_player_by_allycode(client, ally_code: str, fallback_name: str):
         name = pdata.get("name") or fallback_name
         player_id = pdata.get("playerId") or ally_code
         # Save roster snapshot
-        units = extract_roster_units(pdata)
+        units, abilities = extract_roster_units(pdata)
         if units:
-            save_roster_snapshot(player_id, str(date.today()), units)
+            save_roster_snapshot(player_id, str(date.today()), units, abilities)
         return {"id": player_id, "name": name, "gp": total_gp}
     except Exception as e:
         print(f"  Error fetching {fallback_name}: {e}")
@@ -304,13 +316,17 @@ async def fetch_and_cache_unit_names():
         names_to_save = {}
         for unit_id in known_ids:
             name = loc_map.get(f"UNIT_{unit_id}_NAME", "")
-            names_to_save[unit_id] = {
-                "name": name if name else unit_id,
-                "combat_type": 1
-            }
+            names_to_save[unit_id] = {"name": name if name else unit_id, "combat_type": 1}
+
+        # Also load ability names using same localization file
+        ability_ids = get_all_ability_ids()
+        print(f"  Found {len(ability_ids)} unique ability IDs")
+        for ab_id in ability_ids:
+            name = loc_map.get(f"{ab_id.upper()}_NAME", "")
+            names_to_save[ab_id.upper()] = {"name": name if name else ab_id, "combat_type": 0}
 
         save_unit_names(names_to_save)
-        print(f"  Cached {len(names_to_save)} unit names")
+        print(f"  Cached {len(names_to_save)} unit + ability names")
         return len(names_to_save)
 
 @app.get("/player/{player_slug}")

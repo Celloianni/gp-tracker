@@ -310,6 +310,7 @@ function playerApp() {
       if (fields.includes('gear_tier')) return '⚙️';
       if (fields.includes('stars')) return '⭐';
       if (fields.includes('level')) return '📈';
+      if (fields.some(f => f.startsWith('ability'))) return '💡';
       return '✨';
     },
 
@@ -321,6 +322,14 @@ function playerApp() {
         const fromR = c.from <= 1 ? 'G13' : `R${c.from - 1}`;
         const toR = `R${c.to - 1}`;
         return `${fromR} → ${toR}`;
+      }
+      if (c.field === 'ability') {
+        const zeta = c.is_zeta ? ' Ω' : '';
+        return `${c.ability_name}${zeta}: Tier ${c.from} → ${c.to}`;
+      }
+      if (c.field === 'ability_new') {
+        const zeta = c.is_zeta ? ' Ω' : '';
+        return `${c.ability_name}${zeta}: new (Tier ${c.tier})`;
       }
       return `${c.field}: ${c.from} → ${c.to}`;
     },

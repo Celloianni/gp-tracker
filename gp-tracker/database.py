@@ -45,6 +45,17 @@ def init_db():
                 combat_type INTEGER NOT NULL DEFAULT 1
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS roster_ability_snapshots (
+                snapshot_date TEXT NOT NULL,
+                player_id TEXT NOT NULL,
+                unit_id TEXT NOT NULL,
+                ability_id TEXT NOT NULL,
+                tier INTEGER NOT NULL DEFAULT 1,
+                is_zeta INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (snapshot_date, player_id, unit_id, ability_id)
+            )
+        """)
         conn.commit()
 
 def save_snapshot(guild_id: str, players: list):
@@ -508,8 +519,8 @@ def get_friends_history(player_ids: list):
 
         return list(players.values())
 
-def save_roster_snapshot(player_id: str, snapshot_date: str, units: list):
-    """Save roster snapshot for a player. units = list of dicts with unit_id, level, gear_tier, relic_tier, stars, combat_type"""
+def save_roster_snapshot(player_id: str, snapshot_date: str, units: list, abilities: dict = None):
+    """Save roster snapshot. abilities = {unit_id: [{id, tier, is_zeta}, ...]}"""
     with get_conn() as conn:
         for u in units:
             conn.execute("""
@@ -517,6 +528,14 @@ def save_roster_snapshot(player_id: str, snapshot_date: str, units: list):
                 (snapshot_date, player_id, unit_id, current_level, gear_tier, relic_tier, current_stars, combat_type)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (snapshot_date, player_id, u["unit_id"], u["level"], u["gear_tier"], u["relic_tier"], u["stars"], u["combat_type"]))
+        if abilities:
+            for unit_id, unit_abilities in abilities.items():
+                for a in unit_abilities:
+                    conn.execute("""
+                        INSERT OR REPLACE INTO roster_ability_snapshots
+                        (snapshot_date, player_id, unit_id, ability_id, tier, is_zeta)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (snapshot_date, player_id, unit_id, a["id"], a["tier"], a["is_zeta"]))
         conn.commit()
 
 def save_unit_names(units: dict):
@@ -537,6 +556,12 @@ def get_all_unit_ids() -> list:
     """Get all unique unit IDs stored in roster_snapshots."""
     with get_conn() as conn:
         rows = conn.execute("SELECT DISTINCT unit_id FROM roster_snapshots").fetchall()
+        return [r[0] for r in rows]
+
+def get_all_ability_ids() -> list:
+    """Get all unique ability IDs stored in roster_ability_snapshots."""
+    with get_conn() as conn:
+        rows = conn.execute("SELECT DISTINCT ability_id FROM roster_ability_snapshots").fetchall()
         return [r[0] for r in rows]
 
 def get_roster_dates(player_id: str) -> list:
@@ -587,6 +612,22 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
 
         unit_names = {r[0]: r[1] for r in conn.execute("SELECT unit_id, name FROM unit_names").fetchall()}
 
+        # Load abilities for both dates
+        today_abilities = {}
+        for r in conn.execute("""
+            SELECT unit_id, ability_id, tier, is_zeta FROM roster_ability_snapshots
+            WHERE player_id = ? AND snapshot_date = ?
+        """, (player_id, today)).fetchall():
+            today_abilities.setdefault(r[0], {})[r[1]] = {"tier": r[2], "is_zeta": r[3]}
+
+        prev_abilities = {}
+        if prev_date:
+            for r in conn.execute("""
+                SELECT unit_id, ability_id, tier, is_zeta FROM roster_ability_snapshots
+                WHERE player_id = ? AND snapshot_date = ?
+            """, (player_id, prev_date)).fetchall():
+                prev_abilities.setdefault(r[0], {})[r[1]] = {"tier": r[2], "is_zeta": r[3]}
+
         changes = []
         for unit_id, current in today_roster.items():
             name = unit_names.get(unit_id, unit_id)
@@ -612,6 +653,17 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
                     unit_changes.append({"field": "gear_tier", "from": prev["gear_tier"], "to": current["gear_tier"]})
                 if current["relic_tier"] > prev["relic_tier"] and current["relic_tier"] >= 2:
                     unit_changes.append({"field": "relic_tier", "from": prev["relic_tier"], "to": current["relic_tier"]})
+                # Compare abilities
+                cur_abs = today_abilities.get(unit_id, {})
+                prv_abs = prev_abilities.get(unit_id, {})
+                for ab_id, ab_cur in cur_abs.items():
+                    ab_prv = prv_abs.get(ab_id)
+                    ab_name = unit_names.get(ab_id.upper(), ab_id)
+                    if ab_prv is None:
+                        unit_changes.append({"field": "ability_new", "ability_id": ab_id, "ability_name": ab_name, "tier": ab_cur["tier"], "is_zeta": ab_cur["is_zeta"]})
+                    elif ab_cur["tier"] > ab_prv["tier"] or (ab_cur["is_zeta"] and not ab_prv["is_zeta"]):
+                        unit_changes.append({"field": "ability", "ability_id": ab_id, "ability_name": ab_name,
+                                             "from": ab_prv["tier"], "to": ab_cur["tier"], "is_zeta": ab_cur["is_zeta"]})
                 if unit_changes:
                     changes.append({
                         "type": "upgrade",
