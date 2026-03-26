@@ -120,7 +120,7 @@
               </div>
               <div class="change-detail">
                 <span class="new-badge">NEW</span>
-                <span class="stars" x-text="'⭐'.repeat(change.stars || 1)"></span>
+                <span class="stars" x-text="(change.stars || 1) + '⭐'"></span>
                 <template x-if="change.combat_type !== 2">
                   <span x-show="change.relic_tier >= 3" class="relic-badge" x-text="'R' + (change.relic_tier - 2)"></span>
                 </template>
