@@ -57,9 +57,9 @@
 <div class="container">
 
   <!-- Unit names warning -->
-  <div class="unit-names-warn" x-show="unitNamesCount === 0 && !syncingNames">
-    <span>⚠️ Unit names not loaded yet — unit IDs will be shown instead of names.</span>
-    <button class="btn-sync" @click="syncUnitNames()" :disabled="syncingNames">Load Unit Names</button>
+  <div class="unit-names-warn" x-show="!syncingNames">
+    <span x-text="unitNamesCount === 0 ? '⚠️ Unit names not loaded yet — unit IDs will be shown instead of names.' : '✅ Unit names loaded (' + unitNamesCount + '). Click to reload if names look wrong.'"></span>
+    <button class="btn-sync" @click="syncUnitNames()" :disabled="syncingNames" x-text="unitNamesCount === 0 ? 'Load Unit Names' : 'Reload'"></button>
   </div>
   <div class="unit-names-warn" x-show="syncingNames" style="justify-content: center;">
     <span class="spinner"></span>
