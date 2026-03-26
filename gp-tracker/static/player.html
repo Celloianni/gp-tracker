@@ -25,7 +25,8 @@
   .btn-nav:disabled { opacity: 0.3; cursor: not-allowed; }
   .changes-list { display: flex; flex-direction: column; gap: 8px; }
   .change-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: #141625; border-radius: 8px; border: 1px solid #1e2235; }
-  .change-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+  .change-icon { font-size: 18px; width: 40px; height: 40px; text-align: center; flex-shrink: 0; display:flex; align-items:center; justify-content:center; }
+  .change-icon img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #333; }
   .change-name { font-weight: 500; color: #e2e8f0; flex: 1; min-width: 0; }
   .change-name small { display: block; font-size: 11px; color: #64748b; font-weight: 400; }
   .change-detail { font-size: 13px; color: #94a3b8; white-space: nowrap; }
@@ -99,7 +100,14 @@
           <!-- New unit -->
           <template x-if="change.type === 'new'">
             <div style="display:contents">
-              <div class="change-icon" x-text="change.combat_type === 2 ? '🚀' : '🆕'"></div>
+              <div class="change-icon">
+                <template x-if="change.thumbnail_url">
+                  <img :src="change.thumbnail_url" :alt="change.name" @error="$el.style.display='none'">
+                </template>
+                <template x-if="!change.thumbnail_url">
+                  <span x-text="change.combat_type === 2 ? '🚀' : '🆕'"></span>
+                </template>
+              </div>
               <div class="change-name">
                 <span x-text="change.name"></span>
                 <small x-text="change.combat_type === 2 ? 'Ship' : 'Character'"></small>
@@ -114,7 +122,14 @@
           <!-- Upgrade -->
           <template x-if="change.type === 'upgrade'">
             <div style="display:contents">
-              <div class="change-icon" x-text="getUpgradeIcon(change)"></div>
+              <div class="change-icon">
+                <template x-if="change.thumbnail_url">
+                  <img :src="change.thumbnail_url" :alt="change.name" @error="$el.style.display='none'">
+                </template>
+                <template x-if="!change.thumbnail_url">
+                  <span x-text="getUpgradeIcon(change)"></span>
+                </template>
+              </div>
               <div class="change-name">
                 <span x-text="change.name"></span>
                 <small x-text="change.combat_type === 2 ? 'Ship' : 'Character'"></small>

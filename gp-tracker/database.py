@@ -42,9 +42,14 @@ def init_db():
             CREATE TABLE IF NOT EXISTS unit_names (
                 unit_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
-                combat_type INTEGER NOT NULL DEFAULT 1
+                combat_type INTEGER NOT NULL DEFAULT 1,
+                thumbnail_name TEXT
             )
         """)
+        try:
+            conn.execute("ALTER TABLE unit_names ADD COLUMN thumbnail_name TEXT")
+        except Exception:
+            pass  # column already exists
         conn.execute("""
             CREATE TABLE IF NOT EXISTS roster_ability_snapshots (
                 snapshot_date TEXT NOT NULL,
@@ -539,13 +544,13 @@ def save_roster_snapshot(player_id: str, snapshot_date: str, units: list, abilit
         conn.commit()
 
 def save_unit_names(units: dict):
-    """units = {unit_id: {"name": "Darth Revan", "combat_type": 1}}"""
+    """units = {unit_id: {"name": "Darth Revan", "combat_type": 1, "thumbnail_name": "tex.charui_sithrevan"}}"""
     with get_conn() as conn:
         for unit_id, data in units.items():
             conn.execute("""
-                INSERT OR REPLACE INTO unit_names (unit_id, name, combat_type)
-                VALUES (?, ?, ?)
-            """, (unit_id, data["name"], data.get("combat_type", 1)))
+                INSERT OR REPLACE INTO unit_names (unit_id, name, combat_type, thumbnail_name)
+                VALUES (?, ?, ?, ?)
+            """, (unit_id, data["name"], data.get("combat_type", 1), data.get("thumbnail_name")))
         conn.commit()
 
 def get_unit_names_count() -> int:
@@ -610,7 +615,8 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
                                FROM roster_snapshots WHERE player_id = ? AND snapshot_date = ?
                            """, (player_id, prev_date)).fetchall()}
 
-        unit_names = {r[0]: r[1] for r in conn.execute("SELECT unit_id, name FROM unit_names").fetchall()}
+        unit_data = {r[0]: {"name": r[1], "thumbnail_name": r[2]} for r in conn.execute("SELECT unit_id, name, thumbnail_name FROM unit_names").fetchall()}
+        unit_names = {uid: d["name"] for uid, d in unit_data.items()}
 
         # Load abilities for both dates
         today_abilities = {}
@@ -631,11 +637,14 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
         changes = []
         for unit_id, current in today_roster.items():
             name = unit_names.get(unit_id, unit_id)
+            thumb = unit_data.get(unit_id, {}).get("thumbnail_name") or ""
+            thumbnail_url = f"https://game-assets.swgoh.gg/textures/{thumb}.png" if thumb else ""
             if unit_id not in prev_roster:
                 changes.append({
                     "type": "new",
                     "unit_id": unit_id,
                     "name": name,
+                    "thumbnail_url": thumbnail_url,
                     "stars": current["stars"],
                     "level": current["level"],
                     "gear_tier": current["gear_tier"],
@@ -669,6 +678,7 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
                         "type": "upgrade",
                         "unit_id": unit_id,
                         "name": name,
+                        "thumbnail_url": thumbnail_url,
                         "combat_type": current["combat_type"],
                         "changes": unit_changes,
                     })

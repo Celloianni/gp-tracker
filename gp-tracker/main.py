@@ -300,30 +300,48 @@ async def collect(request: Request, auth: bool = Depends(check_auth)):
     return {"status": "started"}
 
 async def fetch_and_cache_unit_names():
-    """Fetch unit names from swgoh-utils gamedata on GitHub and cache in DB."""
+    """Fetch unit names + thumbnails from swgoh-utils gamedata on GitHub and cache in DB."""
     LOC_URL = "https://raw.githubusercontent.com/swgoh-utils/gamedata/main/Loc_ENG_US.txt.json"
-    print("Fetching unit names from swgoh-utils/gamedata GitHub...")
+    UNITS_URL = "https://raw.githubusercontent.com/swgoh-utils/gamedata/main/units.json"
+    print("Fetching unit names + thumbnails from swgoh-utils/gamedata GitHub...")
 
     known_ids = get_all_unit_ids()
     print(f"  Found {len(known_ids)} unique unit IDs in roster snapshots")
 
-    async with httpx.AsyncClient(timeout=120) as client:
-        r = await client.get(LOC_URL)
-        r.raise_for_status()
-        loc_map = r.json().get("data", {})  # {"version": "...", "data": {"UNIT_HANSOLO_NAME": "Han Solo", ...}}
+    async with httpx.AsyncClient(timeout=180) as client:
+        loc_r, units_r = await asyncio.gather(
+            client.get(LOC_URL),
+            client.get(UNITS_URL),
+        )
+        loc_r.raise_for_status()
+        units_r.raise_for_status()
+
+        loc_map = loc_r.json().get("data", {})
         print(f"  Loaded {len(loc_map)} localization strings")
+
+        # Build baseId → thumbnailName map from units.json
+        units_data = units_r.json()
+        thumbnail_map = {}
+        units_list = units_data if isinstance(units_data, list) else units_data.get("data", [])
+        for u in units_list:
+            base_id = u.get("baseId", "").upper()
+            thumb = u.get("thumbnailName", "")
+            if base_id and thumb:
+                thumbnail_map[base_id] = thumb
+        print(f"  Loaded {len(thumbnail_map)} thumbnail names")
 
         names_to_save = {}
         for unit_id in known_ids:
-            name = loc_map.get(f"UNIT_{unit_id}_NAME", "")
-            names_to_save[unit_id] = {"name": name if name else unit_id, "combat_type": 1}
+            name = loc_map.get(f"UNIT_{unit_id}_NAME", "") or unit_id
+            thumb = thumbnail_map.get(unit_id, "")
+            names_to_save[unit_id] = {"name": name, "combat_type": 1, "thumbnail_name": thumb}
 
         # Also load ability names using same localization file
         ability_ids = get_all_ability_ids()
         print(f"  Found {len(ability_ids)} unique ability IDs")
         for ab_id in ability_ids:
-            name = loc_map.get(f"{ab_id.upper()}_NAME", "")
-            names_to_save[ab_id.upper()] = {"name": name if name else ab_id, "combat_type": 0}
+            name = loc_map.get(f"{ab_id.upper()}_NAME", "") or ab_id
+            names_to_save[ab_id.upper()] = {"name": name, "combat_type": 0, "thumbnail_name": ""}
 
         save_unit_names(names_to_save)
         print(f"  Cached {len(names_to_save)} unit + ability names")
