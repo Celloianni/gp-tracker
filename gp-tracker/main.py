@@ -369,23 +369,23 @@ async def unit_names_status(auth: bool = Depends(check_auth)):
 
 @app.get("/api/test/localization")
 async def test_localization(auth: bool = Depends(check_auth)):
-    """Test localization and metadata endpoints."""
+    """Test localization using version from metadata."""
     results = {}
-    async with httpx.AsyncClient(timeout=30) as client:
-        # Check metadata to find correct localization ID
-        try:
-            r = await client.post(f"{COMLINK_URL}/metadata", json={"payload": {}})
-            meta = r.json()
-            results["metadata"] = {"status": r.status_code, "keys": list(meta.keys())[:20], "preview": str(meta)[:500]}
-        except Exception as e:
-            results["metadata"] = {"error": str(e)}
-        # Try localization with different id formats
-        for id_val in ["Loc_ENG_US.txt", "ENG_US", "eng_us"]:
+    async with httpx.AsyncClient(timeout=60) as client:
+        # Step 1: get version from metadata
+        meta_r = await client.post(f"{COMLINK_URL}/metadata", json={"payload": {}})
+        meta = meta_r.json()
+        loc_version = meta.get("latestLocalizationBundleVersion", "")
+        results["loc_version"] = loc_version
+        # Step 2: try localization with real version id
+        for id_val in [loc_version, f"Loc_ENG_US.txt_{loc_version}", loc_version + ":ENG_US"]:
+            if not id_val:
+                continue
             try:
                 r = await client.post(f"{COMLINK_URL}/localization", json={"payload": {"id": id_val}})
-                results[f"loc_{id_val}"] = {"status": r.status_code, "body_preview": r.text[:300]}
+                results[f"loc_{id_val[:30]}"] = {"status": r.status_code, "body_preview": r.text[:300]}
             except Exception as e:
-                results[f"loc_{id_val}"] = {"error": str(e)}
+                results[f"loc_{id_val[:30]}"] = {"error": str(e)}
     return results
 
 @app.get("/api/friends/list")
