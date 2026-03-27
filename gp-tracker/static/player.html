@@ -230,10 +230,10 @@
         </div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <span style="font-size:12px;color:#64748b">Download report in TXT:</span>
-        <button class="btn-sync" style="font-size:12px;background:#2d3148;color:#94a3b8" @click="downloadMonth()" @mouseover="$el.style.background='#3d4060'" @mouseleave="$el.style.background='#2d3148'" x-text="'⬇ ' + calMonthLabel.split(' ')[0]"></button>
-        <button class="btn-sync" style="font-size:12px;background:#2d3148;color:#94a3b8" @click="downloadYear()" @mouseover="$el.style.background='#3d4060'" @mouseleave="$el.style.background='#2d3148'" x-text="'⬇ ' + calMonth.split('-')[0] + ' year'"></button>
+      <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
+        <span style="font-size:12px;color:#64748b">Download TXT:</span>
+        <a href="#" @click.prevent="downloadMonth()" style="font-size:12px;color:#64748b;text-decoration:none;" onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#64748b'" x-text="'⬇ ' + calMonthLabel.split(' ')[0]"></a>
+        <a href="#" @click.prevent="downloadYear()" style="font-size:12px;color:#64748b;text-decoration:none;" onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#64748b'" x-text="'⬇ ' + calMonth.split('-')[0] + ' year'"></a>
       </div>
     </div>
     <div x-show="loadingMonth" class="loading" style="padding:30px">
