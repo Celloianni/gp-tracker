@@ -103,8 +103,6 @@
 
 <div class="header">
   <a href="/" class="back-link">← Friends</a>
-  <div class="header-title" x-text="playerName || 'Loading...'"></div>
-  <div class="header-gp" x-show="currentGp" x-text="currentGp ? currentGp.toLocaleString() + ' GP' : ''"></div>
 </div>
 
 <div class="container">
@@ -112,6 +110,11 @@
   <!-- Unit names warning (only when not loaded) -->
   <div class="unit-names-warn" x-show="unitNamesCount === 0">
     <span>⚠️ Unit names not loaded — unit IDs will be shown instead of names. Reload from ⚙ Settings on the main page.</span>
+  </div>
+
+  <!-- Player name -->
+  <div style="text-align:center;margin-bottom:16px;">
+    <div style="font-size:28px;font-weight:700;color:#e2e8f0;" x-text="playerName || 'Loading...'"></div>
   </div>
 
   <!-- Stats row -->
