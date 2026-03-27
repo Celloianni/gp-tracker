@@ -120,6 +120,11 @@
       <span style="font-size:13px;color:#94a3b8;" x-text="unitNamesCount === null ? 'Loading...' : unitNamesCount === 0 ? '⚠️ Not loaded' : '✅ Loaded (' + unitNamesCount + ' units)'"></span>
       <button class="btn-sm" @click="syncUnitNames()" :disabled="syncingNames" x-text="syncingNames ? 'Reloading...' : 'Reload'"></button>
     </div>
+    <hr style="border:none;border-top:1px solid #2d3148;margin:16px 0;">
+    <div style="display:flex;gap:10px;">
+      <a href="/api/backup" class="btn-sm" style="text-decoration:none;padding:8px 14px;font-size:13px;flex:1;text-align:center;">Download backup</a>
+      <button class="btn" style="flex:1;" @click="showSettings=false; showModal=true; wrongPassword=false">Refresh data</button>
+    </div>
   </div>
 </div>
 
@@ -147,9 +152,7 @@
 <div class="header">
   <h1>GP Tracker</h1>
   <div style="display:flex;gap:10px;align-items:center;">
-    <a href="/api/backup" class="btn-sm" style="text-decoration:none;padding:8px 14px;font-size:13px;">Download backup</a>
     <button class="settings-btn" @click="openSettings()" title="Settings">⚙</button>
-    <button class="btn" @click="showModal=true; wrongPassword=false">Refresh data</button>
   </div>
 </div>
 
