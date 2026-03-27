@@ -485,7 +485,7 @@ function playerApp() {
       const months = [];
       for (let i = 0; i < 12; i++) {
         const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        const val = d.toISOString().slice(0, 7);
+        const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         months.push({ value: val, label });
       }
