@@ -159,7 +159,8 @@
         </div>
         </div>
       </div>
-      <div style="display:flex;gap:8px;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-size:12px;color:#64748b">Завантажити звіт:</span>
         <button class="btn-sync" style="font-size:12px" @click="downloadMonth()" x-text="'⬇ ' + calMonthLabel.split(' ')[0]"></button>
         <button class="btn-sync" style="font-size:12px" @click="downloadYear()" x-text="'⬇ ' + calMonth.split('-')[0] + ' рік'"></button>
       </div>
