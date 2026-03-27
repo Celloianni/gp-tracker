@@ -22,9 +22,14 @@ def init_db():
                 player_id TEXT NOT NULL,
                 player_name TEXT NOT NULL,
                 gp INTEGER NOT NULL,
+                is_final INTEGER NOT NULL DEFAULT 0,
                 UNIQUE(snapshot_date, guild_id, player_id)
             )
         """)
+        try:
+            conn.execute("ALTER TABLE snapshots ADD COLUMN is_final INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass  # column already exists
         conn.execute("""
             CREATE TABLE IF NOT EXISTS roster_snapshots (
                 snapshot_date TEXT NOT NULL,
@@ -63,14 +68,18 @@ def init_db():
         """)
         conn.commit()
 
-def save_snapshot(guild_id: str, players: list):
+def save_snapshot(guild_id: str, players: list, is_final: bool = False):
     today = str(date.today())
     with get_conn() as conn:
         for p in players:
             conn.execute("""
-                INSERT OR REPLACE INTO snapshots (snapshot_date, guild_id, player_id, player_name, gp)
-                VALUES (?, ?, ?, ?, ?)
-            """, (today, guild_id, p["id"], p["name"], p["gp"]))
+                INSERT INTO snapshots (snapshot_date, guild_id, player_id, player_name, gp, is_final)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(snapshot_date, guild_id, player_id) DO UPDATE SET
+                    player_name = excluded.player_name,
+                    gp = excluded.gp,
+                    is_final = CASE WHEN excluded.is_final = 1 THEN 1 ELSE is_final END
+            """, (today, guild_id, p["id"], p["name"], p["gp"], 1 if is_final else 0))
         conn.commit()
 
 def is_empty():
@@ -336,13 +345,23 @@ def set_setting(key: str, value: str):
         conn.commit()
 
 def get_streak(guild_id: str, player_id: str):
-    """Count consecutive days of positive/negative GP growth."""
+    """Count consecutive days of positive/negative GP growth.
+    Uses only is_final=1 snapshots (23:59 updates) when available,
+    falls back to all snapshots for older data."""
     with get_conn() as conn:
+        # Try final snapshots first
         rows = conn.execute("""
             SELECT snapshot_date, gp FROM snapshots
-            WHERE guild_id = ? AND player_id = ?
+            WHERE guild_id = ? AND player_id = ? AND is_final = 1
             ORDER BY snapshot_date DESC LIMIT 60
         """, (guild_id, player_id)).fetchall()
+        # Fall back to all snapshots if not enough finals
+        if len(rows) < 2:
+            rows = conn.execute("""
+                SELECT snapshot_date, gp FROM snapshots
+                WHERE guild_id = ? AND player_id = ?
+                ORDER BY snapshot_date DESC LIMIT 60
+            """, (guild_id, player_id)).fetchall()
 
     if len(rows) < 2:
         return 0

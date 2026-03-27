@@ -111,9 +111,9 @@ async def fetch_player_by_allycode(client, ally_code: str, fallback_name: str):
         print(f"  Error fetching {fallback_name}: {e}")
         return None
 
-async def fetch_friends():
+async def fetch_friends(is_final: bool = False):
     global collection_status
-    print(f"[{date.today()}] Collecting friends data...")
+    print(f"[{date.today()}] Collecting friends data... (final={is_final})")
     collection_status["current"] = "Friends"
     collection_status["done"] = collection_status["done"]  # keep running total
     async with httpx.AsyncClient(timeout=60) as client:
@@ -126,7 +126,7 @@ async def fetch_friends():
             collection_status["done"] += 1
             await asyncio.sleep(0.3)
         if players:
-            save_snapshot("friends", players)
+            save_snapshot("friends", players, is_final=is_final)
             print(f"  Saved {len(players)} friends.")
 
 async def fetch_guild(client, guild):
@@ -174,10 +174,10 @@ async def fetch_guild(client, guild):
 
     players_with_gp = [p for p in players if p["gp"] > 0]
     if players_with_gp:
-        save_snapshot(guild_id, players_with_gp)
+        save_snapshot(guild_id, players_with_gp, is_final=collection_status.get("is_final", False))
         print(f"  Saved {len(players_with_gp)} players for {guild_name}")
 
-async def fetch_all():
+async def fetch_all(is_final: bool = False):
     global collection_status
     # Estimate total: 6 friends + 6 guilds x ~50 players
     estimated_total = len(FRIENDS) + len(GUILDS) * 50
@@ -185,8 +185,9 @@ async def fetch_all():
     collection_status["done"] = 0
     collection_status["total"] = estimated_total
     collection_status["current"] = ""
-    print(f"[{date.today()}] Starting full data collection...")
-    await fetch_friends()
+    collection_status["is_final"] = is_final
+    print(f"[{date.today()}] Starting full data collection... (final={is_final})")
+    await fetch_friends(is_final=is_final)
     async with httpx.AsyncClient(timeout=120) as client:
         for guild in GUILDS:
             await fetch_guild(client, guild)
@@ -252,13 +253,14 @@ async def friends_achievements(auth: bool = Depends(check_auth)):
     return get_monthly_achievements("friends")
 
 @app.post("/api/cron")
-async def cron_trigger(request: Request):
+async def cron_trigger(request: Request, final: int = 0):
     token = request.headers.get("X-Cron-Token", "")
     cron_secret = os.getenv("CRON_SECRET", "")
     if not cron_secret or token != cron_secret:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    asyncio.create_task(fetch_all())
-    return {"status": "started"}
+    is_final = final == 1
+    asyncio.create_task(fetch_all(is_final=is_final))
+    return {"status": "started", "is_final": is_final}
 
 @app.get("/api/settings")
 async def get_settings(auth: bool = Depends(check_auth)):
