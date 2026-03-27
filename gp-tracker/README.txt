@@ -1,7 +1,7 @@
 ================================================================================
   GP TRACKER — ДОКУМЕНТАЦІЯ ПРОЄКТУ
 ================================================================================
-Останнє оновлення: 27 березня 2026
+Останнє оновлення: 28 березня 2026
 
 --------------------------------------------------------------------------------
   ЩО ЦЕ ТАКЕ
@@ -159,6 +159,11 @@ Star Wars: Galaxy of Heroes (SWGOH).
       Пікер: сітка 3×4 місяців + кнопки ← рік → для навігації по роках
       Недоступні місяці (до початку збору або майбутні) — сірі
 
+  Кнопки "Download report in TXT" — завантаження звіту за місяць або рік.
+  — Файл: gp_YYYY-MM.txt (місяць) або gp_YYYY.txt (рік)
+  — Формат: англійська, UTF-8, plaintext
+  — Завантажується за поточним місяцем календаря (змінюється через піккер ▾)
+
   Для кожного юніта в змінах показується:
   — Іконка персонажа (CDN: game-assets.swgoh.gg/textures/{thumbnailName}.png)
   — Назва + тип (Character / Ship)
@@ -200,6 +205,9 @@ Star Wars: Galaxy of Heroes (SWGOH).
   GET  /api/friends/roster_changes/{player_id}  — зміни ростеру (query: date)
   GET  /api/friends/roster_dates/{player_id}    — доступні дати знімків ростеру
   GET  /api/friends/roster_month/{player_id}    — зміни за місяць (query: month=YYYY-MM)
+  GET  /api/friends/export/{player_id}          — завантажити TXT звіт
+                                                  query: report_type=month&month=YYYY-MM
+                                                      або report_type=year&year=YYYY
 
   POST /api/admin/sync_unit_names     — завантажити/оновити назви юнітів
   GET  /api/admin/unit_names_status   — кількість збережених назв юнітів
