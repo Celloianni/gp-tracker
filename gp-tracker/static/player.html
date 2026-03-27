@@ -513,7 +513,18 @@ function playerApp() {
 
 
     activityColor(level) {
-      const colors = ['#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e','#10b981','#14b8a6','#06b6d4','#6366f1'];
+      const colors = [
+        '#dc2626', // 1
+        '#ea580c', // 2
+        '#f97316', // 3
+        '#fb923c', // 4
+        '#fbbf24', // 5
+        '#d4b800', // 6
+        '#a3c400', // 7
+        '#65b800', // 8
+        '#16a34a', // 9
+        '#00e052', // 10
+      ];
       const idx = Math.min(10, Math.max(1, level || 1)) - 1;
       return colors[idx];
     },
