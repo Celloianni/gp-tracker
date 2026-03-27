@@ -114,6 +114,12 @@
       <button class="btn-sm" @click="showSettings=false">Cancel</button>
       <button class="btn" @click="savePlan()">Save</button>
     </div>
+    <hr style="border:none;border-top:1px solid #2d3148;margin:16px 0;">
+    <label style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:8px;">Unit names</label>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <span style="font-size:13px;color:#94a3b8;" x-text="unitNamesCount === null ? 'Loading...' : unitNamesCount === 0 ? '⚠️ Not loaded' : '✅ Loaded (' + unitNamesCount + ' units)'"></span>
+      <button class="btn-sm" @click="syncUnitNames()" :disabled="syncingNames" x-text="syncingNames ? 'Reloading...' : 'Reload'"></button>
+    </div>
   </div>
 </div>
 
@@ -347,6 +353,8 @@ function tracker() {
     showSettings: false,
     planInput: 100000,
     planError: '',
+    unitNamesCount: null,
+    syncingNames: false,
     friendsSortDir: -1,
     friendsMonth: '',
     friendsMonths: [],
@@ -579,10 +587,22 @@ function tracker() {
       const idx = Math.min(10, Math.max(1, level || 1)) - 1;
       return colors[idx];
     },
-    openSettings() {
+    async openSettings() {
       this.planInput = this.monthlyPlan;
       this.planError = '';
       this.showSettings = true;
+      const r = await fetch('/api/admin/unit_names_status');
+      if (r.ok) { const s = await r.json(); this.unitNamesCount = s.count; }
+    },
+
+    async syncUnitNames() {
+      this.syncingNames = true;
+      try {
+        const r = await fetch('/api/admin/sync_unit_names', { method: 'POST' });
+        if (r.ok) { const d = await r.json(); this.unitNamesCount = d.count; }
+      } finally {
+        this.syncingNames = false;
+      }
     },
 
     async savePlan() {

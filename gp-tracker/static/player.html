@@ -46,9 +46,6 @@
   .gear-g13 { background: #422006; color: #fcd34d; }
   .type-badge { font-size: 11px; color: #64748b; }
   .unit-names-warn { background: #1c1410; border: 1px solid #92400e; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #fbbf24; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .btn-sync { background: #7c3aed; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-  .btn-sync:hover { background: #6d28d9; }
-  .btn-sync:disabled { background: #3d2d6e; cursor: not-allowed; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .spinner { width: 14px; height: 14px; border: 2px solid #3d2d6e; border-top-color: #a78bfa; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle; }
   [x-cloak] { display: none !important; }
@@ -101,14 +98,9 @@
 
 <div class="container">
 
-  <!-- Unit names warning -->
-  <div class="unit-names-warn" x-show="!syncingNames">
-    <span x-text="unitNamesCount === 0 ? '⚠️ Unit names not loaded yet — unit IDs will be shown instead of names.' : '✅ Unit names loaded (' + unitNamesCount + '). Click to reload if names look wrong.'"></span>
-    <button class="btn-sync" @click="syncUnitNames()" :disabled="syncingNames" x-text="unitNamesCount === 0 ? 'Load Unit Names' : 'Reload'"></button>
-  </div>
-  <div class="unit-names-warn" x-show="syncingNames" style="justify-content: center;">
-    <span class="spinner"></span>
-    <span style="margin-left:8px">Syncing unit names from comlink...</span>
+  <!-- Unit names warning (only when not loaded) -->
+  <div class="unit-names-warn" x-show="unitNamesCount === 0">
+    <span>⚠️ Unit names not loaded — unit IDs will be shown instead of names. Reload from ⚙ Settings on the main page.</span>
   </div>
 
   <!-- Upgraded Yesterday -->
@@ -302,7 +294,7 @@ function playerApp() {
     loadingChanges: false,
     historyLoaded: false,
     unitNamesCount: null,
-    syncingNames: false,
+
     gpChart: null,
     yesterdayChanges: [],
     loadingYesterday: false,
@@ -443,19 +435,6 @@ function playerApp() {
       } catch(e) { console.error(e); }
     },
 
-    async syncUnitNames() {
-      this.syncingNames = true;
-      try {
-        const r = await fetch('/api/admin/sync_unit_names', { method: 'POST' });
-        if (r.ok) {
-          const data = await r.json();
-          this.unitNamesCount = data.count;
-          // Reload changes to show proper names
-          if (this.selectedDate) await this.loadChanges();
-        }
-      } catch(e) { console.error(e); }
-      finally { this.syncingNames = false; }
-    },
 
     gearClass(g) {
       if (g >= 13) return 'gear-badge gear-g13';
