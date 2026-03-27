@@ -713,6 +713,27 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
             "changes": changes,
         }
 
+def get_player_gp_for_period(player_id: str, date_from: str, date_to: str) -> dict:
+    """Get first and last GP for a player in a date range (guild_id='friends')."""
+    with get_conn() as conn:
+        first = conn.execute("""
+            SELECT gp, snapshot_date FROM snapshots WHERE guild_id = 'friends' AND player_id = ?
+            AND snapshot_date >= ? AND snapshot_date <= ?
+            ORDER BY snapshot_date ASC LIMIT 1
+        """, (player_id, date_from, date_to)).fetchone()
+        last = conn.execute("""
+            SELECT gp, snapshot_date FROM snapshots WHERE guild_id = 'friends' AND player_id = ?
+            AND snapshot_date >= ? AND snapshot_date <= ?
+            ORDER BY snapshot_date DESC LIMIT 1
+        """, (player_id, date_from, date_to)).fetchone()
+    return {
+        "gp_start": first[0] if first else None,
+        "gp_start_date": first[1] if first else None,
+        "gp_end": last[0] if last else None,
+        "gp_end_date": last[1] if last else None,
+    }
+
+
 def get_roster_changes_for_month(player_id: str, year_month: str) -> dict:
     """Get roster changes for each day in a month. Returns {date: {has_snapshot, has_prev, changes}}"""
     with get_conn() as conn:

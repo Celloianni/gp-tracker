@@ -8,9 +8,94 @@ from fastapi.responses import JSONResponse, RedirectResponse, FileResponse as Fa
 import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements, save_roster_snapshot, save_unit_names, get_unit_names_count, get_all_unit_ids, get_all_ability_ids, get_roster_dates, get_roster_changes, get_roster_changes_for_month
+from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements, save_roster_snapshot, save_unit_names, get_unit_names_count, get_all_unit_ids, get_all_ability_ids, get_roster_dates, get_roster_changes, get_roster_changes_for_month, get_player_gp_for_period
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
+
+UA_MONTHS_NOM = {
+    1: "Січень", 2: "Лютий", 3: "Березень", 4: "Квітень",
+    5: "Травень", 6: "Червень", 7: "Липень", 8: "Серпень",
+    9: "Вересень", 10: "Жовтень", 11: "Листопад", 12: "Грудень",
+}
+UA_MONTHS_GEN = {
+    1: "січня", 2: "лютого", 3: "березня", 4: "квітня",
+    5: "травня", 6: "червня", 7: "липня", 8: "серпня",
+    9: "вересня", 10: "жовтня", 11: "листопада", 12: "грудня",
+}
+
+def _fmt_change_ua(c: dict) -> str:
+    field = c.get("field", "")
+    if field == "stars":
+        return f"{c['from']}⭐ → {c['to']}⭐"
+    if field == "level":
+        return f"Рівень {c['from']} → {c['to']}"
+    if field == "gear_tier":
+        return f"G{c['from']} → G{c['to']}"
+    if field == "relic_tier":
+        from_r = "G13" if c.get("from", 0) <= 2 else f"R{c['from'] - 2}"
+        to_r = f"R{c['to'] - 2}"
+        return f"{from_r} → {to_r}"
+    if field == "ability":
+        zeta = " Ω" if c.get("is_zeta") else ""
+        name = c.get("ability_name") or c.get("ability_id", "")
+        return f"{name}{zeta}: Рівень {c['from']} → {c['to']}"
+    if field == "ability_new":
+        zeta = " Ω" if c.get("is_zeta") else ""
+        name = c.get("ability_name") or c.get("ability_id", "")
+        return f"{name}{zeta}: новий (Рівень {c.get('tier', '?')})"
+    return f"{field}: {c.get('from', '?')} → {c.get('to', '?')}"
+
+
+def _generate_month_block(player_name: str, player_id: str, year: int, month: int) -> str:
+    import calendar as cal_mod
+    SEP  = "=" * 80
+    SEP2 = "-" * 80
+    month_str  = f"{year}-{str(month).zfill(2)}"
+    month_label = f"{UA_MONTHS_NOM[month]} {year}"
+    last_day   = cal_mod.monthrange(year, month)[1]
+    date_from  = f"{year}-{str(month).zfill(2)}-01"
+    date_to    = f"{year}-{str(month).zfill(2)}-{str(last_day).zfill(2)}"
+
+    gp = get_player_gp_for_period(player_id, date_from, date_to)
+    month_data = get_roster_changes_for_month(player_id, month_str)
+
+    lines = [SEP, f"  GP TRACKER — {player_name}", f"  {month_label}", SEP]
+
+    if gp["gp_start"] is not None and gp["gp_end"] is not None:
+        diff = gp["gp_end"] - gp["gp_start"]
+        diff_str = f"+{diff:,}" if diff >= 0 else f"{diff:,}"
+        lines.append(f"GP на початку місяця:  {gp['gp_start']:,}")
+        lines.append(f"GP наприкінці місяця:  {gp['gp_end']:,}")
+        lines.append(f"Приріст за місяць:     {diff_str}")
+    else:
+        lines.append("(Даних GP за цей місяць немає)")
+
+    days_with_changes = []
+    days_no_changes   = []
+    for date_str in sorted(month_data.keys()):
+        day_data = month_data[date_str]
+        day_num  = int(date_str.split("-")[2])
+        upgrades = [c for c in day_data.get("changes", []) if c.get("type") == "upgrade"]
+        if upgrades:
+            days_with_changes.append((day_num, date_str, upgrades))
+        elif day_data.get("has_prev"):
+            days_no_changes.append(day_num)
+
+    for day_num, date_str, upgrades in days_with_changes:
+        lines.append(SEP2)
+        lines.append(f"  {day_num} {UA_MONTHS_GEN[month]} {year}")
+        lines.append(SEP2)
+        for change in upgrades:
+            labels = ", ".join(_fmt_change_ua(c) for c in change.get("changes", []))
+            lines.append(f"  {change['name']:<32} {labels}")
+
+    lines.append(SEP2)
+    if days_no_changes:
+        lines.append(f"  Дні без змін: {', '.join(str(d) for d in sorted(days_no_changes))}")
+    else:
+        lines.append("  Дні без змін: немає")
+    lines.append(SEP)
+    return "\n".join(lines)
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
 DB_PATH = "/data/gp_tracker.db"
 SITE_PASSWORD = os.getenv("SITE_PASSWORD", "")
@@ -462,3 +547,55 @@ async def test_localization(auth: bool = Depends(check_auth)):
 async def friends_list(auth: bool = Depends(check_auth)):
     """Return friends list with ally codes for player page routing."""
     return [{"allyCode": f["allyCode"], "name": f["name"]} for f in FRIENDS]
+
+@app.get("/api/friends/export/{player_id}")
+async def export_player_txt(
+    player_id: str,
+    type: str = "month",
+    month: str = None,
+    year: str = None,
+    auth: bool = Depends(check_auth),
+):
+    """Generate and download a TXT report for a friend.
+    type=month&month=YYYY-MM  — report for one month
+    type=year&year=YYYY       — report for entire year (all months)
+    """
+    from fastapi.responses import Response
+    from datetime import date as date_cls
+    import calendar as cal_mod
+
+    # Find player name
+    player_name = player_id
+    for f in FRIENDS:
+        if f["allyCode"] == player_id:
+            player_name = f["name"]
+            break
+
+    if type == "month":
+        if not month:
+            month = date_cls.today().strftime("%Y-%m")
+        y, m = int(month.split("-")[0]), int(month.split("-")[1])
+        content = _generate_month_block(player_name, player_id, y, m) + "\n"
+        ua_month = UA_MONTHS_NOM[m].lower()
+        filename = f"gp_{player_name.replace(' ', '_')}_{ua_month}_{y}.txt"
+    else:
+        if not year:
+            year = str(date_cls.today().year)
+        y = int(year)
+        today = date_cls.today()
+        blocks = []
+        for m in range(1, 13):
+            # Skip future months
+            if y > today.year:
+                break
+            if y == today.year and m > today.month:
+                break
+            blocks.append(_generate_month_block(player_name, player_id, y, m))
+        content = "\n\n".join(blocks) + "\n"
+        filename = f"gp_{player_name.replace(' ', '_')}_{y}.txt"
+
+    return Response(
+        content=content.encode("utf-8"),
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

@@ -138,9 +138,10 @@
 
   <!-- Calendar -->
   <div class="section">
-    <div style="position:relative;margin-bottom:16px">
-      <button class="cal-title-btn" @click="showMonthPicker = !showMonthPicker" x-text="calMonthLabel + ' ▾'"></button>
-      <div class="month-picker" x-show="showMonthPicker" @click.away="showMonthPicker = false" x-cloak>
+    <div style="position:relative;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="position:relative">
+        <button class="cal-title-btn" @click="showMonthPicker = !showMonthPicker" x-text="calMonthLabel + ' ▾'"></button>
+        <div class="month-picker" x-show="showMonthPicker" @click.away="showMonthPicker = false" x-cloak>
         <div class="month-picker-year">
           <button class="picker-nav" @click="if(pickerYear > earliestYear) pickerYear--" :disabled="pickerYear <= earliestYear">‹</button>
           <span x-text="pickerYear"></span>
@@ -156,6 +157,11 @@
             </button>
           </template>
         </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button class="btn-sync" style="font-size:12px" @click="downloadMonth()" x-text="'⬇ ' + calMonthLabel.split(' ')[0]"></button>
+        <button class="btn-sync" style="font-size:12px" @click="downloadYear()" x-text="'⬇ ' + calMonth.split('-')[0] + ' рік'"></button>
       </div>
     </div>
     <div x-show="loadingMonth" class="loading" style="padding:30px">
@@ -614,6 +620,17 @@ function playerApp() {
       if (change.type === 'new') return 'NEW';
       if (!change.changes || change.changes.length === 0) return '';
       return change.changes.map(c => this.formatChangeLabel(c)).join(', ');
+    },
+
+    downloadMonth() {
+      if (!this.calMonth) return;
+      window.location.href = `/api/friends/export/${this.playerId}?type=month&month=${this.calMonth}`;
+    },
+
+    downloadYear() {
+      if (!this.calMonth) return;
+      const year = this.calMonth.split('-')[0];
+      window.location.href = `/api/friends/export/${this.playerId}?type=year&year=${year}`;
     },
   }
 }
