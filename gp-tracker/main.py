@@ -418,6 +418,16 @@ async def test_unit_stat(ally_code: str, auth: bool = Depends(check_auth)):
             "unitStat": u.get("unitStat"),
         }
 
+@app.delete("/api/admin/roster_snapshot/{date}")
+async def delete_roster_snapshot(date: str, auth: bool = Depends(check_auth)):
+    """Delete all roster snapshots for a given date (one-time cleanup)."""
+    from database import get_conn
+    with get_conn() as conn:
+        r1 = conn.execute("DELETE FROM roster_snapshots WHERE snapshot_date = ?", (date,))
+        r2 = conn.execute("DELETE FROM roster_ability_snapshots WHERE snapshot_date = ?", (date,))
+        conn.commit()
+    return {"deleted_units": r1.rowcount, "deleted_abilities": r2.rowcount, "date": date}
+
 @app.get("/api/test/localization")
 async def test_localization(auth: bool = Depends(check_auth)):
     """Test swgoh.gg API for unit names."""
