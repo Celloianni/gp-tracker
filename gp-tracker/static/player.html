@@ -123,8 +123,8 @@
         <div class="stats-value" x-text="playerStats ? '#' + playerStats.rank : ''"></div>
         <div class="stats-rank-change"
           x-show="playerStats && playerStats.rank_change !== 0"
-          :style="playerStats && playerStats.rank_change < 0 ? 'color:#34d399' : 'color:#f87171'"
-          x-text="playerStats ? (playerStats.rank_change < 0 ? '↑' + Math.abs(playerStats.rank_change) : '↓' + playerStats.rank_change) : ''">
+          :style="playerStats && playerStats.rank_change > 0 ? 'color:#34d399' : 'color:#f87171'"
+          x-text="playerStats ? (playerStats.rank_change > 0 ? '↑' + playerStats.rank_change : '↓' + Math.abs(playerStats.rank_change)) : ''">
         </div>
       </div>
     </div>
