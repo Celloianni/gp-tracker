@@ -1,7 +1,7 @@
 import os
 import httpx
 import asyncio
-from datetime import date
+from datetime import date, datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse as FastAPIFileResponse
@@ -274,6 +274,7 @@ async def fetch_all(is_final: bool = False):
     collection_status["running"] = False
     collection_status["current"] = "Done"
     collection_status["done"] = collection_status["total"]
+    set_setting("last_updated", datetime.now().strftime("%Y-%m-%d %H:%M"))
     print("Collection complete.")
 
 @asynccontextmanager
@@ -344,7 +345,10 @@ async def cron_trigger(request: Request, final: int = 0):
 
 @app.get("/api/settings")
 async def get_settings(auth: bool = Depends(check_auth)):
-    return {"monthly_plan": int(get_setting("monthly_plan", "100000"))}
+    return {
+        "monthly_plan": int(get_setting("monthly_plan", "100000")),
+        "last_updated": get_setting("last_updated", ""),
+    }
 
 @app.post("/api/settings")
 async def update_settings(request: Request, auth: bool = Depends(check_auth)):

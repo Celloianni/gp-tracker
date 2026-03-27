@@ -176,6 +176,7 @@
     </div>
     <div class="guild-header">
       <div class="guild-name">Friends</div>
+      <span x-show="lastUpdated" x-text="'Updated: ' + lastUpdated" style="font-size:12px;color:#64748b;margin-left:8px;"></span>
       <select class="month-select" x-model="friendsMonth" @change="loadFriends(true)" x-show="friendsMonths.length">
         <option value="">Current month</option>
         <template x-for="m in friendsMonths" :key="m">
@@ -273,6 +274,7 @@
     <div class="guild-header">
       <div class="guild-name" x-text="guilds.find(g => g.id === activeTab)?.name"></div>
       <a :href="'https://swgoh.gg/g/' + activeTab + '/'" target="_blank" class="guild-link">View on swgoh.gg ↗</a>
+      <span x-show="lastUpdated" x-text="'Updated: ' + lastUpdated" style="font-size:12px;color:#64748b;margin-left:8px;"></span>
       <select class="month-select" x-model="guildMonth" @change="loadGuild(activeTab, true)" x-show="guildMonths.length" style="margin-left:auto;">
         <option value="">Current month</option>
         <template x-for="m in guildMonths" :key="m">
@@ -365,6 +367,7 @@ function tracker() {
     wrongPassword: false,
     progressPct: 0,
     progressLabel: 'Starting...',
+    lastUpdated: '',
 
     async init() {
       const [guildsR, settingsR, monthsR] = await Promise.all([
@@ -377,6 +380,7 @@ function tracker() {
       const settings = await settingsR.json();
       this.monthlyPlan = settings.monthly_plan;
       this.planInput = settings.monthly_plan;
+      this.lastUpdated = settings.last_updated || '';
       this.friendsMonths = await monthsR.json();
       await this.loadFriends();
     },
@@ -507,6 +511,8 @@ function tracker() {
         this.progressLabel = 'Done!';
         await new Promise(r => setTimeout(r, 800));
         this.showModal = false;
+        const s = await fetch('/api/settings').then(r => r.json());
+        this.lastUpdated = s.last_updated || '';
         await this.autoRefresh();
       } catch(e) { console.error(e); }
       finally { this.collecting = false; this.progressPct = 0; }
