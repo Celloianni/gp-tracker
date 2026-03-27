@@ -712,3 +712,33 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
             "prev_date": prev_date,
             "changes": changes,
         }
+
+def get_roster_changes_for_month(player_id: str, year_month: str) -> dict:
+    """Get roster changes for each day in a month. Returns {date: {has_snapshot, has_prev, changes}}"""
+    with get_conn() as conn:
+        all_dates = [r[0] for r in conn.execute("""
+            SELECT DISTINCT snapshot_date FROM roster_snapshots
+            WHERE player_id = ?
+            ORDER BY snapshot_date
+        """, (player_id,)).fetchall()]
+
+    month_dates = [d for d in all_dates if d.startswith(year_month)]
+
+    result = {}
+    for date in month_dates:
+        prev_dates = [d for d in all_dates if d < date]
+        prev_date = prev_dates[-1] if prev_dates else None
+        if prev_date:
+            changes_data = get_roster_changes(player_id, date)
+            result[date] = {
+                "has_snapshot": True,
+                "has_prev": True,
+                "changes": changes_data["changes"]
+            }
+        else:
+            result[date] = {
+                "has_snapshot": True,
+                "has_prev": False,
+                "changes": []
+            }
+    return result
