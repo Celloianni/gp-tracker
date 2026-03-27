@@ -160,9 +160,9 @@
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <span style="font-size:12px;color:#64748b">Завантажити звіт:</span>
+        <span style="font-size:12px;color:#64748b">Download report in TXT:</span>
         <button class="btn-sync" style="font-size:12px;background:#2d3148;color:#94a3b8" @click="downloadMonth()" @mouseover="$el.style.background='#3d4060'" @mouseleave="$el.style.background='#2d3148'" x-text="'⬇ ' + calMonthLabel.split(' ')[0]"></button>
-        <button class="btn-sync" style="font-size:12px;background:#2d3148;color:#94a3b8" @click="downloadYear()" @mouseover="$el.style.background='#3d4060'" @mouseleave="$el.style.background='#2d3148'" x-text="'⬇ ' + calMonth.split('-')[0] + ' рік'"></button>
+        <button class="btn-sync" style="font-size:12px;background:#2d3148;color:#94a3b8" @click="downloadYear()" @mouseover="$el.style.background='#3d4060'" @mouseleave="$el.style.background='#2d3148'" x-text="'⬇ ' + calMonth.split('-')[0] + ' year'"></button>
       </div>
     </div>
     <div x-show="loadingMonth" class="loading" style="padding:30px">
@@ -625,13 +625,13 @@ function playerApp() {
 
     downloadMonth() {
       if (!this.calMonth) return;
-      window.location.href = `/api/friends/export/${this.playerId}?type=month&month=${this.calMonth}`;
+      window.location.href = `/api/friends/export/${this.playerId}?report_type=month&month=${this.calMonth}`;
     },
 
     downloadYear() {
       if (!this.calMonth) return;
       const year = this.calMonth.split('-')[0];
-      window.location.href = `/api/friends/export/${this.playerId}?type=year&year=${year}`;
+      window.location.href = `/api/friends/export/${this.playerId}?report_type=year&year=${year}`;
     },
   }
 }

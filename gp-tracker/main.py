@@ -551,51 +551,58 @@ async def friends_list(auth: bool = Depends(check_auth)):
 @app.get("/api/friends/export/{player_id}")
 async def export_player_txt(
     player_id: str,
-    type: str = "month",
+    report_type: str = "month",
     month: str = None,
     year: str = None,
     auth: bool = Depends(check_auth),
 ):
     """Generate and download a TXT report for a friend.
-    type=month&month=YYYY-MM  — report for one month
-    type=year&year=YYYY       — report for entire year (all months)
+    report_type=month&month=YYYY-MM  — report for one month
+    report_type=year&year=YYYY       — report for entire year (all months)
     """
+    import traceback
     from fastapi.responses import Response
     from datetime import date as date_cls
-    import calendar as cal_mod
 
-    # Find player name
-    player_name = player_id
-    for f in FRIENDS:
-        if f["allyCode"] == player_id:
-            player_name = f["name"]
-            break
+    try:
+        # Find player name by playerId stored in DB (not allyCode)
+        player_name = None
+        from database import get_conn
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT player_name FROM snapshots WHERE guild_id='friends' AND player_id=? LIMIT 1",
+                (player_id,)
+            ).fetchone()
+            if row:
+                player_name = row[0]
+        if not player_name:
+            player_name = player_id
 
-    if type == "month":
-        if not month:
-            month = date_cls.today().strftime("%Y-%m")
-        y, m = int(month.split("-")[0]), int(month.split("-")[1])
-        content = _generate_month_block(player_name, player_id, y, m) + "\n"
-        ua_month = UA_MONTHS_NOM[m].lower()
-        filename = f"gp_{player_name.replace(' ', '_')}_{ua_month}_{y}.txt"
-    else:
-        if not year:
-            year = str(date_cls.today().year)
-        y = int(year)
-        today = date_cls.today()
-        blocks = []
-        for m in range(1, 13):
-            # Skip future months
-            if y > today.year:
-                break
-            if y == today.year and m > today.month:
-                break
-            blocks.append(_generate_month_block(player_name, player_id, y, m))
-        content = "\n\n".join(blocks) + "\n"
-        filename = f"gp_{player_name.replace(' ', '_')}_{y}.txt"
+        if report_type == "month":
+            if not month:
+                month = date_cls.today().strftime("%Y-%m")
+            y, m = int(month.split("-")[0]), int(month.split("-")[1])
+            content = _generate_month_block(player_name, player_id, y, m) + "\n"
+            filename = f"gp_{y}-{str(m).zfill(2)}.txt"
+        else:
+            if not year:
+                year = str(date_cls.today().year)
+            y = int(year)
+            today = date_cls.today()
+            blocks = []
+            for m in range(1, 13):
+                if y == today.year and m > today.month:
+                    break
+                blocks.append(_generate_month_block(player_name, player_id, y, m))
+            content = "\n\n".join(blocks) + "\n"
+            filename = f"gp_{y}.txt"
 
-    return Response(
-        content=content.encode("utf-8"),
-        media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+        return Response(
+            content=content.encode("utf-8"),
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f"export_player_txt error:\n{tb}")
+        raise HTTPException(status_code=500, detail=str(e))
