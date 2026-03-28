@@ -402,25 +402,30 @@ def set_setting(key: str, value: str):
 
 def get_streak(guild_id: str, player_id: str):
     """Count consecutive days of positive/negative GP growth.
-    Uses only is_final=1 snapshots (00:00 updates) when available,
-    falls back to all snapshots for older data.
-    Today's non-final snapshot is always excluded to avoid breaking
-    streaks before the day is complete."""
+    Uses one snapshot per calendar day (MAX gp), full history.
+    Excludes today if it has no is_final=1 snapshot yet (day not complete),
+    to avoid breaking streaks before the day is over."""
     today = today_kyiv()
     with get_conn() as conn:
-        # Try final snapshots first
-        rows = conn.execute("""
-            SELECT snapshot_date, gp FROM snapshots
-            WHERE guild_id = ? AND player_id = ? AND is_final = 1
-            ORDER BY snapshot_date DESC LIMIT 60
-        """, (guild_id, player_id)).fetchall()
-        # Fall back to all snapshots if not enough finals,
-        # but exclude today's snapshot if it's not final yet
-        if len(rows) < 2:
+        # Check if today is finalized
+        today_final = conn.execute("""
+            SELECT 1 FROM snapshots
+            WHERE guild_id = ? AND player_id = ? AND snapshot_date = ? AND is_final = 1
+        """, (guild_id, player_id, today)).fetchone()
+
+        # One row per day (MAX gp), exclude today if not finalized
+        if today_final:
             rows = conn.execute("""
-                SELECT snapshot_date, gp FROM snapshots
+                SELECT snapshot_date, MAX(gp) as gp FROM snapshots
                 WHERE guild_id = ? AND player_id = ?
-                AND NOT (snapshot_date = ? AND is_final = 0)
+                GROUP BY snapshot_date
+                ORDER BY snapshot_date DESC LIMIT 60
+            """, (guild_id, player_id)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT snapshot_date, MAX(gp) as gp FROM snapshots
+                WHERE guild_id = ? AND player_id = ? AND snapshot_date < ?
+                GROUP BY snapshot_date
                 ORDER BY snapshot_date DESC LIMIT 60
             """, (guild_id, player_id, today)).fetchall()
 
