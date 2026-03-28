@@ -106,12 +106,14 @@
 
 <div class="modal-bg" x-show="showSettings" @keydown.escape.window="showSettings=false">
   <div class="modal">
-    <h2>Settings</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h2 style="margin:0;">Settings</h2>
+      <button @click="showSettings=false" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;line-height:1;padding:0 4px;" title="Close">✕</button>
+    </div>
     <label style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:8px;">Monthly GP plan (for all guilds)</label>
     <input type="number" x-model="planInput" style="width:100%;background:#141625;border:1px solid #2d3148;border-radius:8px;padding:10px 14px;color:#e2e8f0;font-size:14px;outline:none;margin-bottom:12px;" placeholder="100000" @keydown.enter="savePlan()">
     <div class="error-msg" x-show="planError" x-text="planError"></div>
     <div class="modal-btns">
-      <button class="btn-sm" @click="showSettings=false">Cancel</button>
       <button class="btn" @click="savePlan()">Save</button>
     </div>
     <hr style="border:none;border-top:1px solid #2d3148;margin:16px 0;">
@@ -123,7 +125,7 @@
     <hr style="border:none;border-top:1px solid #2d3148;margin:16px 0;">
     <div style="display:flex;gap:10px;">
       <a href="/api/backup" class="btn-sm" style="text-decoration:none;padding:8px 14px;font-size:13px;flex:1;text-align:center;">Download backup</a>
-      <button class="btn" style="flex:1;" @click="showSettings=false; showModal=true; wrongPassword=false">Refresh data</button>
+      <button class="btn" style="flex:1;" @click="showSettings=false; showModal=true; wrongPassword=false">Refresh all data</button>
     </div>
   </div>
 </div>
