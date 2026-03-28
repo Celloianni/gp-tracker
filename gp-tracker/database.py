@@ -834,3 +834,105 @@ def get_roster_changes_for_month(player_id: str, year_month: str) -> dict:
                 "changes": []
             }
     return result
+
+def get_roster_month_summary(player_id: str, year_month: str) -> dict:
+    """Compare first and last roster snapshot of a month. Each unit shown once with net change."""
+    with get_conn() as conn:
+        month_start = year_month + "-01"
+
+        first_date = conn.execute("""
+            SELECT MIN(snapshot_date) FROM roster_snapshots
+            WHERE player_id = ? AND snapshot_date >= ?
+        """, (player_id, month_start)).fetchone()[0]
+
+        last_date = conn.execute("""
+            SELECT MAX(snapshot_date) FROM roster_snapshots
+            WHERE player_id = ? AND snapshot_date >= ?
+        """, (player_id, month_start)).fetchone()[0]
+
+        if not first_date or not last_date or first_date == last_date:
+            return {"changes": [], "date_from": first_date, "date_to": last_date}
+
+        first_roster = {r[0]: {"level": r[1], "gear_tier": r[2], "relic_tier": r[3], "stars": r[4], "combat_type": r[5]}
+                        for r in conn.execute("""
+                            SELECT unit_id, current_level, gear_tier, relic_tier, current_stars, combat_type
+                            FROM roster_snapshots WHERE player_id = ? AND snapshot_date = ?
+                        """, (player_id, first_date)).fetchall()}
+
+        last_roster = {r[0]: {"level": r[1], "gear_tier": r[2], "relic_tier": r[3], "stars": r[4], "combat_type": r[5]}
+                       for r in conn.execute("""
+                           SELECT unit_id, current_level, gear_tier, relic_tier, current_stars, combat_type
+                           FROM roster_snapshots WHERE player_id = ? AND snapshot_date = ?
+                       """, (player_id, last_date)).fetchall()}
+
+        unit_data = {r[0]: {"name": r[1], "thumbnail_name": r[2], "combat_type": r[3]}
+                     for r in conn.execute("SELECT unit_id, name, thumbnail_name, combat_type FROM unit_names").fetchall()}
+        unit_names = {uid: d["name"] for uid, d in unit_data.items()}
+
+        first_abilities = {}
+        for r in conn.execute("""
+            SELECT unit_id, ability_id, tier, is_zeta FROM roster_ability_snapshots
+            WHERE player_id = ? AND snapshot_date = ?
+        """, (player_id, first_date)).fetchall():
+            first_abilities.setdefault(r[0], {})[r[1]] = {"tier": r[2], "is_zeta": r[3]}
+
+        last_abilities = {}
+        for r in conn.execute("""
+            SELECT unit_id, ability_id, tier, is_zeta FROM roster_ability_snapshots
+            WHERE player_id = ? AND snapshot_date = ?
+        """, (player_id, last_date)).fetchall():
+            last_abilities.setdefault(r[0], {})[r[1]] = {"tier": r[2], "is_zeta": r[3]}
+
+        changes = []
+        for unit_id, current in last_roster.items():
+            name = unit_names.get(unit_id, unit_id)
+            ud = unit_data.get(unit_id, {})
+            thumb = ud.get("thumbnail_name") or ""
+            thumbnail_url = f"https://game-assets.swgoh.gg/textures/{thumb}.png" if thumb else ""
+            combat_type = ud.get("combat_type") or current["combat_type"]
+
+            if unit_id not in first_roster:
+                changes.append({
+                    "type": "new",
+                    "unit_id": unit_id,
+                    "name": name,
+                    "thumbnail_url": thumbnail_url,
+                    "stars": current["stars"],
+                    "level": current["level"],
+                    "gear_tier": current["gear_tier"],
+                    "relic_tier": current["relic_tier"],
+                    "combat_type": combat_type,
+                })
+            else:
+                prev = first_roster[unit_id]
+                unit_changes = []
+                if current["stars"] > prev["stars"]:
+                    unit_changes.append({"field": "stars", "from": prev["stars"], "to": current["stars"]})
+                if current["level"] > prev["level"]:
+                    unit_changes.append({"field": "level", "from": prev["level"], "to": current["level"]})
+                if current["gear_tier"] > prev["gear_tier"]:
+                    unit_changes.append({"field": "gear_tier", "from": prev["gear_tier"], "to": current["gear_tier"]})
+                if current["relic_tier"] > prev["relic_tier"] and current["relic_tier"] >= 2:
+                    unit_changes.append({"field": "relic_tier", "from": prev["relic_tier"], "to": current["relic_tier"]})
+                cur_abs = last_abilities.get(unit_id, {})
+                prv_abs = first_abilities.get(unit_id, {})
+                for ab_id, ab_cur in cur_abs.items():
+                    ab_prv = prv_abs.get(ab_id)
+                    ab_name = unit_names.get(ab_id.upper(), ab_id)
+                    if ab_prv is None:
+                        unit_changes.append({"field": "ability_new", "ability_id": ab_id, "ability_name": ab_name, "tier": ab_cur["tier"], "is_zeta": ab_cur["is_zeta"]})
+                    elif ab_cur["tier"] > ab_prv["tier"] or (ab_cur["is_zeta"] and not ab_prv["is_zeta"]):
+                        unit_changes.append({"field": "ability", "ability_id": ab_id, "ability_name": ab_name,
+                                             "from": ab_prv["tier"], "to": ab_cur["tier"], "is_zeta": ab_cur["is_zeta"]})
+                if unit_changes:
+                    changes.append({
+                        "type": "upgrade",
+                        "unit_id": unit_id,
+                        "name": name,
+                        "thumbnail_url": thumbnail_url,
+                        "combat_type": combat_type,
+                        "changes": unit_changes,
+                    })
+
+        changes.sort(key=lambda x: (0 if x["type"] == "new" else 1, x["name"]))
+        return {"changes": changes, "date_from": first_date, "date_to": last_date}

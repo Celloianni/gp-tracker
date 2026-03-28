@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, FileResponse as Fa
 import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements, save_roster_snapshot, save_unit_names, get_unit_names_count, get_all_unit_ids, get_all_ability_ids, get_roster_dates, get_roster_changes, get_roster_changes_for_month, get_player_gp_for_period
+from database import init_db, save_snapshot, get_progress, is_empty, get_friends_history, get_available_months, get_progress_for_month, get_monthly_progress, get_setting, set_setting, get_monthly_achievements, save_roster_snapshot, save_unit_names, get_unit_names_count, get_all_unit_ids, get_all_ability_ids, get_roster_dates, get_roster_changes, get_roster_changes_for_month, get_player_gp_for_period, get_roster_month_summary, today_kyiv
 
 COMLINK_URL = os.getenv("COMLINK_URL", "http://localhost:8080")
 
@@ -466,6 +466,12 @@ async def roster_month(player_id: str, month: str = None, auth: bool = Depends(c
         from datetime import date
         month = date.today().strftime("%Y-%m")
     return get_roster_changes_for_month(player_id, month)
+
+@app.get("/api/friends/roster_month_summary/{player_id}")
+async def roster_month_summary(player_id: str, month: str = None, auth: bool = Depends(check_auth)):
+    if not month:
+        month = today_kyiv()[:7]
+    return get_roster_month_summary(player_id, month)
 
 @app.post("/api/admin/sync_unit_names")
 async def sync_unit_names(request: Request, auth: bool = Depends(check_auth)):
