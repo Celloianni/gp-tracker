@@ -214,9 +214,6 @@
                   <span class="rank-change down" x-show="p.rank_change < 0" x-text="'↓'+Math.abs(p.rank_change)"></span>
                 </div>
               </td>
-              <td style="width:20px;padding-right:0;">
-                <span class="activity-dot" :style="'background:'+activityColor(p.activity)"></span>
-              </td>
               <td class="name" style="white-space:nowrap;">
                 <a :href="'/player/details?id=' + p.id + '&name=' + encodeURIComponent(p.name)"
                    class="player-link"
@@ -251,10 +248,9 @@
       <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:#94a3b8;line-height:1.6;">
         <div><span style="color:#e2e8f0;font-weight:500;">#</span> — порядковий номер у поточному сортуванні. За замовчуванням — по GP Growth, тому #1 = найбільший приріст за місяць.</div>
         <div><span style="color:#34d399;font-weight:500;">↑↓</span> — зміна позиції по GP Growth відносно останнього оновлення.</div>
-        <div><span style="color:#e2e8f0;font-weight:500;">●</span> — візуалізація регулярності. Колір росте від червоного до зеленого з кожним днем позитивного streak і падає з кожним днем негативного. Один пропущений день не скидає в нуль — зміна відбувається поступово.</div>
         <div><span style="color:#e2e8f0;font-weight:500;">GP Now</span> — поточний GP гравця на момент останнього снапшоту. Дані оновлюються тричі на день: 06:00, 15:00, 00:00 (Київ).</div>
         <div><span style="color:#e2e8f0;font-weight:500;">GP Growth</span> — приріст GP з 1-го числа поточного місяця до сьогодні. На початку нового місяця скидається до нуля.</div>
-        <div><span style="color:#e2e8f0;font-weight:500;">Streak</span> — кількість днів поспіль з позитивним або негативним приростом. +3 days = три дні поспіль GP ріс. -1 days = вчора GP не виріс.</div>
+        <div><span style="color:#34d399;font-weight:500;">7 days</span> — активність за останні 7 днів. <span style="color:#34d399;">▌</span> зелений = GP виріс, <span style="color:#ef4444;">▌</span> червоний = GP не виріс, темний = немає даних.</div>
         <div><span style="color:#e2e8f0;font-weight:500;">Plan %</span> — відсоток виконання місячного плану. План можна змінити через ⚙ у шапці.</div>
       </div>
     </div>
@@ -319,9 +315,6 @@
                   <span class="rank-change up" x-show="p.rank_change > 0" x-text="'↑'+p.rank_change"></span>
                   <span class="rank-change down" x-show="p.rank_change < 0" x-text="'↓'+Math.abs(p.rank_change)"></span>
                 </div>
-              </td>
-              <td style="width:20px;padding-right:0;">
-                <span class="activity-dot" :style="'background:'+activityColor(p.activity)"></span>
               </td>
               <td class="name" style="max-width:220px;white-space:nowrap;overflow:hidden;">
                 <span :title="p.name" style="display:inline-block;max-width:130px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;" x-text="p.name"></span>
