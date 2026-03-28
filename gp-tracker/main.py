@@ -274,7 +274,8 @@ async def fetch_all(is_final: bool = False):
     collection_status["running"] = False
     collection_status["current"] = "Done"
     collection_status["done"] = collection_status["total"]
-    set_setting("last_updated", datetime.now().strftime("%Y-%m-%d %H:%M"))
+    from zoneinfo import ZoneInfo
+    set_setting("last_updated", datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%Y-%m-%d %H:%M"))
     print("Collection complete.")
 
 @asynccontextmanager
