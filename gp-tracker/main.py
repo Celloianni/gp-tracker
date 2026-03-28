@@ -185,7 +185,9 @@ async def fetch_player_by_allycode(client, ally_code: str, fallback_name: str):
         # Save roster snapshot
         units, abilities = extract_roster_units(pdata)
         if units:
-            save_roster_snapshot(player_id, str(date.today()), units, abilities)
+            from zoneinfo import ZoneInfo
+            today_str = datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%Y-%m-%d")
+            save_roster_snapshot(player_id, today_str, units, abilities)
         return {"id": player_id, "name": name, "gp": total_gp}
     except Exception as e:
         print(f"  Error fetching {fallback_name}: {e}")
@@ -327,8 +329,7 @@ async def months(guild_id: str, auth: bool = Depends(check_auth)):
 
 @app.get("/api/friends/history")
 async def friends_history(auth: bool = Depends(check_auth)):
-    friend_ids = [f["allyCode"] for f in FRIENDS]
-    return get_friends_history(friend_ids)
+    return get_friends_history()
 
 @app.get("/api/friends/achievements")
 async def friends_achievements(auth: bool = Depends(check_auth)):

@@ -1,7 +1,13 @@
 import sqlite3
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 DB_PATH = "/data/gp_tracker.db"
+_KYIV = ZoneInfo("Europe/Kyiv")
+
+def today_kyiv() -> str:
+    """Return today's date string in Kyiv timezone (YYYY-MM-DD)."""
+    return datetime.now(_KYIV).strftime("%Y-%m-%d")
 
 def get_conn():
     return sqlite3.connect(DB_PATH)
@@ -69,7 +75,7 @@ def init_db():
         conn.commit()
 
 def save_snapshot(guild_id: str, players: list, is_final: bool = False):
-    today = str(date.today())
+    today = today_kyiv()
     with get_conn() as conn:
         for p in players:
             conn.execute("""
@@ -162,9 +168,9 @@ def get_progress(guild_id: str):
 
 def get_monthly_progress(guild_id: str):
     """Get GP growth from 1st of current month to today for all players."""
-    from datetime import date, timedelta
-    today = str(date.today())
-    week_ago = str(date.today() - timedelta(days=7))
+    from datetime import timedelta
+    today = today_kyiv()
+    week_ago = str((datetime.now(_KYIV) - timedelta(days=7)).date())
     month_start = today[:8] + "01"
 
     with get_conn() as conn:
@@ -287,9 +293,9 @@ def get_available_months(guild_id: str):
         return [r[0] for r in rows]
 
 def get_progress_for_month(guild_id: str, month: str):
-    from datetime import date, timedelta
-    today = str(date.today())
-    week_ago = str(date.today() - timedelta(days=7))
+    from datetime import timedelta
+    today = today_kyiv()
+    week_ago = str((datetime.now(_KYIV) - timedelta(days=7)).date())
     with get_conn() as conn:
         # First snapshot of the month
         first_date = conn.execute("""
@@ -380,7 +386,8 @@ def get_progress_for_month(guild_id: str, month: str):
             "latest_date": last_date,
             "prev_date": first_date,
             "players": players,
-            "dates": [first_date, last_date]
+            "dates": [first_date, last_date],
+            "monthly_plan": monthly_plan,
         }
 
 def get_setting(key: str, default: str = "") -> str:
@@ -399,8 +406,7 @@ def get_streak(guild_id: str, player_id: str):
     falls back to all snapshots for older data.
     Today's non-final snapshot is always excluded to avoid breaking
     streaks before the day is complete."""
-    from datetime import date as _date
-    today = str(_date.today())
+    today = today_kyiv()
     with get_conn() as conn:
         # Try final snapshots first
         rows = conn.execute("""
@@ -467,8 +473,7 @@ def get_activity_level(guild_id: str, player_id: str) -> int:
 
 def get_rank_change(guild_id: str, player_id: str, current_diff_rank: int):
     """Compare GP Growth rank today vs yesterday, both measured from start of month."""
-    from datetime import date as _date
-    today = str(_date.today())
+    today = today_kyiv()
     month_start = today[:8] + "01"
 
     with get_conn() as conn:
@@ -517,9 +522,9 @@ def get_rank_change(guild_id: str, player_id: str, current_diff_rank: int):
 
 def get_monthly_achievements(guild_id: str) -> dict:
     """Calculate achievements. Monthly ones shown only first 7 days of new month."""
-    from datetime import date, timedelta
+    from datetime import timedelta
 
-    today = date.today()
+    today = datetime.now(_KYIV).date()
     achievements = {}  # player_name -> list of (emoji, tooltip)
 
     # Monthly achievements — only show first 7 days of the month
@@ -582,15 +587,14 @@ def get_monthly_achievements(guild_id: str) -> dict:
 
     return achievements
 
-def get_friends_history(player_ids: list):
+def get_friends_history():
     with get_conn() as conn:
-        placeholders = ",".join("?" * len(player_ids))
-        rows = conn.execute(f"""
+        rows = conn.execute("""
             SELECT snapshot_date, player_id, player_name, gp
             FROM snapshots
-            WHERE guild_id = 'friends' AND player_id IN ({placeholders})
+            WHERE guild_id = 'friends'
             ORDER BY snapshot_date ASC
-        """, player_ids).fetchall()
+        """).fetchall()
 
         players = {}
         for snapshot_date, player_id, player_name, gp in rows:

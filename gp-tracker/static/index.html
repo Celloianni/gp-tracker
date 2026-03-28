@@ -514,14 +514,20 @@ function tracker() {
         if (r.status === 401) { this.wrongPassword = true; this.collecting = false; return; }
         this.password = '';
         await new Promise(resolve => {
+          let noRunningCount = 0;
           const poll = setInterval(async () => {
             try {
               const s = await fetch('/api/status').then(r => r.json());
               this.progressPct = s.pct;
               this.progressLabel = s.current ? `${s.current} (${s.done}/${s.total})` : 'Starting...';
-              if (!s.running && s.current === 'Done') {
-                clearInterval(poll);
-                resolve();
+              if (!s.running) {
+                noRunningCount++;
+                if (s.current === 'Done' || noRunningCount >= 3) {
+                  clearInterval(poll);
+                  resolve();
+                }
+              } else {
+                noRunningCount = 0;
               }
             } catch(e) {}
           }, 2000);
@@ -552,7 +558,7 @@ function tracker() {
           const now = new Date(latest.date);
           const target = new Date(now);
           target.setDate(target.getDate() - 30);
-          const targetStr = target.toISOString().slice(0, 10);
+          const targetStr = `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
           const older = sorted.filter(h => h.date <= targetStr);
           const base = older.length ? older[older.length - 1] : sorted[0];
           growth = latest.gp - base.gp;
@@ -639,6 +645,7 @@ function tracker() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({monthly_plan: plan})
       });
+      if (!r.ok) { const err = await r.json(); this.planError = err.detail || 'Error saving plan'; return; }
       const data = await r.json();
       this.monthlyPlan = data.monthly_plan;
       this.showSettings = false;
