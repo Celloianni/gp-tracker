@@ -257,7 +257,7 @@
             <div class="unit-card-icon" x-text="change.combat_type === 2 ? '🚀' : '⚔️'"></div>
           </template>
           <div class="unit-card-name" x-text="change.name"></div>
-          <div class="unit-card-change" :style="'color:' + cardChangeColor(change)" x-text="formatCardChange(change)"></div>
+          <div class="unit-card-change" x-html="formatCardChangeHtml(change)"></div>
         </div>
       </template>
     </div>
@@ -639,21 +639,46 @@ function playerApp() {
       }).join('<br>') + (cell.changes.length > 4 ? `<br><span style="color:#64748b">+${cell.changes.length - 4} more</span>` : '');
     },
 
-    formatCardChange(change) {
-      if (change.type === 'new') return 'NEW';
-      if (!change.changes || change.changes.length === 0) return '';
-      return change.changes.map(c => this.formatChangeLabel(c)).join(', ');
+    gearTierColor(tier) {
+      if (tier >= 12) return '#fcd34d';  // G12/G13 — золотий
+      if (tier >= 8)  return '#c4b5fd';  // G8-G11  — фіолетовий
+      if (tier >= 5)  return '#93c5fd';  // G5-G7   — синій
+      if (tier >= 2)  return '#86efac';  // G2-G4   — зелений
+      return '#9ca3af';                  // G1      — сірий
     },
 
-    cardChangeColor(change) {
-      if (change.type === 'new') return '#34d399';           // зелений — новий юніт
-      const fields = (change.changes || []).map(c => c.field);
-      if (fields.includes('relic_tier'))  return '#a78bfa';  // фіолетовий — relic
-      if (fields.includes('gear_tier'))   return '#fbbf24';  // золотий — gear
-      if (fields.includes('stars'))       return '#f59e0b';  // жовтий — зірки
-      if (fields.some(f => f.startsWith('ability'))) return '#60a5fa'; // блакитний — ability
-      if (fields.includes('level'))       return '#94a3b8';  // сірий — level
-      return '#34d399';
+    relicTierColor(tier) {
+      if (tier <= 2) return '#fcd34d';   // G13 (before relic) — золотий
+      return '#f87171';                  // R1+ — червоний
+    },
+
+    formatChangeLabelHtml(c) {
+      const s = (text, color) => `<span style="color:${color}">${text}</span>`;
+      if (c.field === 'gear_tier') {
+        return `${s('G'+c.from, this.gearTierColor(c.from))} → ${s('G'+c.to, this.gearTierColor(c.to))}`;
+      }
+      if (c.field === 'relic_tier') {
+        const fromLabel = c.from <= 2 ? 'G13' : `R${c.from - 2}`;
+        const toLabel = `R${c.to - 2}`;
+        return `${s(fromLabel, this.relicTierColor(c.from))} → ${s(toLabel, '#f87171')}`;
+      }
+      if (c.field === 'stars')  return s(`${c.from}⭐ → ${c.to}⭐`, '#fbbf24');
+      if (c.field === 'level')  return s(`Lvl ${c.from} → ${c.to}`, '#94a3b8');
+      if (c.field === 'ability') {
+        const zeta = c.is_zeta ? ' Ω' : '';
+        return s(`${c.ability_name}${zeta}: Tier ${c.from} → ${c.to}`, '#60a5fa');
+      }
+      if (c.field === 'ability_new') {
+        const zeta = c.is_zeta ? ' Ω' : '';
+        return s(`${c.ability_name}${zeta}: new (Tier ${c.tier})`, '#60a5fa');
+      }
+      return `${c.field}: ${c.from} → ${c.to}`;
+    },
+
+    formatCardChangeHtml(change) {
+      if (change.type === 'new') return '<span style="color:#34d399">NEW</span>';
+      if (!change.changes || change.changes.length === 0) return '';
+      return change.changes.map(c => this.formatChangeLabelHtml(c)).join(', ');
     },
 
     downloadMonth() {
