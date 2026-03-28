@@ -149,32 +149,12 @@
         x-text="playerStats ? (playerStats.diff >= 0 ? '+' : '') + playerStats.diff.toLocaleString() : ''">
       </div>
     </div>
-    <!-- Streak -->
-    <div class="stats-cell">
-      <div class="stats-label">Streak</div>
-      <div style="display:flex;align-items:center;gap:6px;">
-        <div class="stats-value"
-          :class="playerStats && playerStats.streak > 0 ? 'green' : (playerStats && playerStats.streak < 0 ? 'red' : '')"
-          x-text="playerStats ? (playerStats.streak > 0 ? '+' : '') + playerStats.streak + ' days' : ''">
-        </div>
-        <span x-show="playerStats && playerStats.streak >= 7" style="font-size:18px;" title="Streak +7 days!">🔥</span>
-        <span x-show="playerStats && playerStats.streak <= -3" style="font-size:18px;" title="Streak -3 days and below">🥶</span>
-      </div>
-    </div>
     <!-- Plan % -->
     <div class="stats-cell" x-show="playerStats && playerStats.plan_pct !== undefined">
       <div class="stats-label" x-text="playerStats ? 'Plan ' + (playerStats.monthly_plan ? (playerStats.monthly_plan/1000).toFixed(0)+'K' : '') : ''"></div>
       <div class="stats-value"
         :class="playerStats && playerStats.plan_pct >= 100 ? 'green' : (playerStats && playerStats.plan_pct >= 50 ? 'orange' : 'red')"
         x-text="playerStats ? playerStats.plan_pct + '%' : ''">
-      </div>
-    </div>
-    <!-- Activity dot -->
-    <div class="stats-cell" style="flex:0 0 auto;min-width:60px;align-items:flex-end;">
-      <div class="stats-label">Activity</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
-        <span class="stats-dot" :style="playerStats ? 'background:' + activityColor(playerStats.activity) : ''"></span>
-        <span style="font-size:13px;color:#94a3b8;" x-text="playerStats ? playerStats.activity + '/10' : ''"></span>
       </div>
     </div>
   </div>
