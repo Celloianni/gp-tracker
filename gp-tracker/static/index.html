@@ -322,10 +322,10 @@
               <td style="width:20px;padding-right:0;">
                 <span class="activity-dot" :style="'background:'+activityColor(p.activity)"></span>
               </td>
-              <td class="name">
-                <span x-text="p.name"></span>
+              <td class="name" style="max-width:220px;white-space:nowrap;overflow:hidden;">
+                <span :title="p.name" style="display:inline-block;max-width:130px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;" x-text="p.name"></span>
                 <template x-if="p.is_new">
-                  <span style="margin-left:8px;vertical-align:middle;white-space:nowrap;">
+                  <span style="margin-left:6px;vertical-align:middle;white-space:nowrap;">
                     <span style="background:#16a34a;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:0.05em;">NEW</span>
                     <span style="font-size:11px;color:#64748b;margin-left:4px;" x-text="'joined ' + (p.join_date ? p.join_date.slice(8,10)+'.'+p.join_date.slice(5,7) : '')"></span>
                   </span>
