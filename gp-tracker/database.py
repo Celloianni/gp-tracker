@@ -195,6 +195,11 @@ def get_monthly_progress(guild_id: str):
                 (guild_id, first_date)
             ).fetchall()}
 
+        # First ever snapshot for this guild (to distinguish truly new members)
+        guild_first_date = conn.execute("""
+            SELECT MIN(snapshot_date) FROM snapshots WHERE guild_id = ?
+        """, (guild_id,)).fetchone()[0]
+
         # Join dates: first ever snapshot per player in this guild
         join_dates = {r[0]: r[1] for r in conn.execute("""
             SELECT player_id, MIN(snapshot_date) FROM snapshots
@@ -246,7 +251,7 @@ def get_monthly_progress(guild_id: str):
                 "rank": diff_rank,
                 "rank_change": rank_change,
                 "join_date": jd,
-                "is_new": bool(jd and jd >= week_ago),
+                "is_new": bool(jd and jd >= week_ago and jd > guild_first_date),
             })
 
         return {
@@ -299,6 +304,11 @@ def get_progress_for_month(guild_id: str, month: str):
                 (guild_id, first_date)
             ).fetchall()}
 
+        # First ever snapshot for this guild (to distinguish truly new members)
+        guild_first_date = conn.execute("""
+            SELECT MIN(snapshot_date) FROM snapshots WHERE guild_id = ?
+        """, (guild_id,)).fetchone()[0]
+
         # Join dates: first ever snapshot per player in this guild
         join_dates = {r[0]: r[1] for r in conn.execute("""
             SELECT player_id, MIN(snapshot_date) FROM snapshots
@@ -346,7 +356,7 @@ def get_progress_for_month(guild_id: str, month: str):
                 "rank": rank,
                 "rank_change": rank_change,
                 "join_date": jd,
-                "is_new": bool(jd and jd >= week_ago),
+                "is_new": bool(jd and jd >= week_ago and jd > guild_first_date),
             })
 
         players.sort(key=lambda x: x["diff"], reverse=True)
