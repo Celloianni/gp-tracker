@@ -446,24 +446,19 @@ def get_streak(guild_id: str, player_id: str):
 
 def get_activity_level(guild_id: str, player_id: str) -> int:
     """
-    Calculate activity level 1-10 based on smoothed streak history.
+    Calculate activity level 1-10 based on GP growth history.
     Each day of positive GP growth: +1 level (max 10)
     Each day of negative/zero GP growth: -1 level (min 1)
     Starts at level 1 if no data.
-    Uses is_final=1 snapshots when available, falls back to all snapshots.
+    Uses one snapshot per calendar day (MAX gp), full history.
     """
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT snapshot_date, gp FROM snapshots
-            WHERE guild_id = ? AND player_id = ? AND is_final = 1
+            SELECT snapshot_date, MAX(gp) as gp FROM snapshots
+            WHERE guild_id = ? AND player_id = ?
+            GROUP BY snapshot_date
             ORDER BY snapshot_date ASC
         """, (guild_id, player_id)).fetchall()
-        if len(rows) < 2:
-            rows = conn.execute("""
-                SELECT snapshot_date, gp FROM snapshots
-                WHERE guild_id = ? AND player_id = ?
-                ORDER BY snapshot_date ASC
-            """, (guild_id, player_id)).fetchall()
 
     if len(rows) < 2:
         return 1
