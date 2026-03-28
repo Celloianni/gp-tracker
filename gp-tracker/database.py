@@ -772,6 +772,7 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
                         "name": name,
                         "thumbnail_url": thumbnail_url,
                         "combat_type": combat_type,
+                        "stars": current["stars"],
                         "changes": unit_changes,
                     })
 
@@ -931,6 +932,7 @@ def get_roster_month_summary(player_id: str, year_month: str) -> dict:
                         "name": name,
                         "thumbnail_url": thumbnail_url,
                         "combat_type": combat_type,
+                        "stars": current["stars"],
                         "changes": unit_changes,
                     })
 
