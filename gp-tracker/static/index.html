@@ -231,10 +231,14 @@
                 </template>
               </td>
               <td>
-                <div style="display:flex;align-items:flex-end;gap:2px;height:16px;">
-                  <template x-for="(bar, i) in (p.days_7 || [])" :key="i">
-                    <div :style="'width:5px;border-radius:2px;background:' + (bar>0?'#34d399':bar<0?'#ef4444':'#1e2235') + ';height:' + (bar>0?'100%':bar<0?'55%':'25%')"></div>
-                  </template>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <div style="display:flex;align-items:flex-end;gap:2px;height:16px;">
+                    <template x-for="(bar, i) in (p.days_7 || [])" :key="i">
+                      <div :style="'width:5px;border-radius:2px;background:' + (bar>0?'#34d399':bar<0?'#ef4444':'#1e2235') + ';height:' + (bar>0?'100%':bar<0?'55%':'25%')"></div>
+                    </template>
+                  </div>
+                  <span x-show="(p.days_7||[]).length===7 && (p.days_7||[]).every(b=>b>0)" style="font-size:14px;" title="7 days green!">🔥</span>
+                  <span x-show="(p.days_7||[]).length===7 && (p.days_7||[]).every(b=>b<0)" style="font-size:14px;" title="7 days red">🥶</span>
                 </div>
               </td>
               <td style="text-align:center;"><span :class="planPctClass(p.plan_pct)" x-text="p.plan_pct > 0 ? p.plan_pct + '%' : '—'"></span></td>
@@ -334,10 +338,14 @@
                 </template>
               </td>
               <td>
-                <div style="display:flex;align-items:flex-end;gap:2px;height:16px;">
-                  <template x-for="(bar, i) in (p.days_7 || [])" :key="i">
-                    <div :style="'width:5px;border-radius:2px;background:' + (bar>0?'#34d399':bar<0?'#ef4444':'#1e2235') + ';height:' + (bar>0?'100%':bar<0?'55%':'25%')"></div>
-                  </template>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <div style="display:flex;align-items:flex-end;gap:2px;height:16px;">
+                    <template x-for="(bar, i) in (p.days_7 || [])" :key="i">
+                      <div :style="'width:5px;border-radius:2px;background:' + (bar>0?'#34d399':bar<0?'#ef4444':'#1e2235') + ';height:' + (bar>0?'100%':bar<0?'55%':'25%')"></div>
+                    </template>
+                  </div>
+                  <span x-show="(p.days_7||[]).length===7 && (p.days_7||[]).every(b=>b>0)" style="font-size:14px;" title="7 days green!">🔥</span>
+                  <span x-show="(p.days_7||[]).length===7 && (p.days_7||[]).every(b=>b<0)" style="font-size:14px;" title="7 days red">🥶</span>
                 </div>
               </td>
               <td style="text-align:center;"><span :class="planPctClass(p.plan_pct)" x-text="p.plan_pct > 0 ? p.plan_pct + '%' : '—'"></span></td>

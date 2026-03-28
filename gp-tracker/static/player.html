@@ -149,6 +149,19 @@
         x-text="playerStats ? (playerStats.diff >= 0 ? '+' : '') + playerStats.diff.toLocaleString() : ''">
       </div>
     </div>
+    <!-- 7-day achievement -->
+    <template x-if="playerStats && (playerStats.days_7||[]).every(b=>b>0)">
+      <div class="stats-cell" style="flex:0 0 auto;min-width:40px;align-items:center;">
+        <div class="stats-label">7 days</div>
+        <div style="font-size:22px;margin-top:2px;">🔥</div>
+      </div>
+    </template>
+    <template x-if="playerStats && (playerStats.days_7||[]).every(b=>b<0)">
+      <div class="stats-cell" style="flex:0 0 auto;min-width:40px;align-items:center;">
+        <div class="stats-label">7 days</div>
+        <div style="font-size:22px;margin-top:2px;">🥶</div>
+      </div>
+    </template>
     <!-- Plan % -->
     <div class="stats-cell" x-show="playerStats && playerStats.plan_pct !== undefined">
       <div class="stats-label" x-text="playerStats ? 'Plan ' + (playerStats.monthly_plan ? (playerStats.monthly_plan/1000).toFixed(0)+'K' : '') : ''"></div>
