@@ -688,6 +688,9 @@ def get_roster_changes(player_id: str, date: str = None) -> dict:
         today = dates[0]
         prev_date = dates[1] if len(dates) > 1 else None
 
+        if not prev_date:
+            return {"date": today, "prev_date": None, "changes": []}
+
         today_roster = {r[0]: {"level": r[1], "gear_tier": r[2], "relic_tier": r[3], "stars": r[4], "combat_type": r[5]}
                         for r in conn.execute("""
                             SELECT unit_id, current_level, gear_tier, relic_tier, current_stars, combat_type
