@@ -348,15 +348,15 @@ def get_progress_for_month(guild_id: str, month: str):
                 "join_date": join_dates.get(pid),
             })
 
-        players_raw.sort(key=lambda x: x["gp"], reverse=True)
-        gp_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
+        players_raw.sort(key=lambda x: x["diff"], reverse=True)
+        diff_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
 
         players = []
         for p in players_raw:
             streak = get_streak(guild_id, p["id"])
             activity = get_activity_level(guild_id, p["id"])
-            rank = gp_ranks[p["id"]]
-            rank_change = get_rank_change(guild_id, p["id"], rank)
+            diff_rank = diff_ranks[p["id"]]
+            rank_change = get_rank_change(guild_id, p["id"], diff_rank)
             jd = p["join_date"]
             players.append({
                 "id": p["id"],
@@ -368,7 +368,7 @@ def get_progress_for_month(guild_id: str, month: str):
                 "plan_pct": p["plan_pct"],
                 "streak": streak,
                 "activity": activity,
-                "rank": rank,
+                "rank": diff_rank,
                 "rank_change": rank_change,
                 "join_date": jd,
                 "is_new": bool(jd and jd >= week_ago and jd > guild_first_date),
