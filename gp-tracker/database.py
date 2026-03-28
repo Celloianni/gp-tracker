@@ -347,7 +347,11 @@ def set_setting(key: str, value: str):
 def get_streak(guild_id: str, player_id: str):
     """Count consecutive days of positive/negative GP growth.
     Uses only is_final=1 snapshots (23:59 updates) when available,
-    falls back to all snapshots for older data."""
+    falls back to all snapshots for older data.
+    Today's non-final snapshot is always excluded to avoid breaking
+    streaks before the day is complete."""
+    from datetime import date as _date
+    today = str(_date.today())
     with get_conn() as conn:
         # Try final snapshots first
         rows = conn.execute("""
@@ -355,13 +359,15 @@ def get_streak(guild_id: str, player_id: str):
             WHERE guild_id = ? AND player_id = ? AND is_final = 1
             ORDER BY snapshot_date DESC LIMIT 60
         """, (guild_id, player_id)).fetchall()
-        # Fall back to all snapshots if not enough finals
+        # Fall back to all snapshots if not enough finals,
+        # but exclude today's snapshot if it's not final yet
         if len(rows) < 2:
             rows = conn.execute("""
                 SELECT snapshot_date, gp FROM snapshots
                 WHERE guild_id = ? AND player_id = ?
+                AND NOT (snapshot_date = ? AND is_final = 0)
                 ORDER BY snapshot_date DESC LIMIT 60
-            """, (guild_id, player_id)).fetchall()
+            """, (guild_id, player_id, today)).fetchall()
 
     if len(rows) < 2:
         return 0
