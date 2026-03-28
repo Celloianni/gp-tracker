@@ -451,43 +451,45 @@ def get_activity_level(guild_id: str, player_id: str) -> int:
     return level
 
 def get_rank_change(guild_id: str, player_id: str, current_diff_rank: int):
-    """Compare GP Growth rank today vs yesterday."""
-    with get_conn() as conn:
-        dates = [r[0] for r in conn.execute("""
-            SELECT DISTINCT snapshot_date FROM snapshots
-            WHERE guild_id = ? ORDER BY snapshot_date DESC LIMIT 3
-        """, (guild_id,)).fetchall()]
-
-    if len(dates) < 2:
-        return 0
-
-    today = dates[0]
-    yesterday = dates[1]
+    """Compare GP Growth rank today vs yesterday, both measured from start of month."""
+    from datetime import date as _date
+    today = str(_date.today())
+    month_start = today[:8] + "01"
 
     with get_conn() as conn:
-        today_gp = {r[0]: r[1] for r in conn.execute(
-            "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
-            (guild_id, today)
-        ).fetchall()}
+        # Yesterday = most recent snapshot before today
+        row = conn.execute("""
+            SELECT MAX(snapshot_date) FROM snapshots
+            WHERE guild_id = ? AND snapshot_date < ?
+        """, (guild_id, today)).fetchone()
+        yesterday = row[0] if row else None
+
+        if not yesterday:
+            return 0
+
+        # Start of month snapshot
+        first_date = conn.execute("""
+            SELECT MIN(snapshot_date) FROM snapshots
+            WHERE guild_id = ? AND snapshot_date >= ?
+        """, (guild_id, month_start)).fetchone()[0]
+
+        if not first_date or first_date == yesterday:
+            return 0
+
         yesterday_gp = {r[0]: r[1] for r in conn.execute(
             "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
             (guild_id, yesterday)
         ).fetchall()}
 
-    # Calculate yesterday's diffs (vs day before)
-    with get_conn() as conn:
-        if len(dates) >= 3:
-            day_before = dates[2]
-            day_before_gp = {r[0]: r[1] for r in conn.execute(
-                "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
-                (guild_id, day_before)
-            ).fetchall()}
-        else:
-            day_before_gp = yesterday_gp
+        month_start_gp = {r[0]: r[1] for r in conn.execute(
+            "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+            (guild_id, first_date)
+        ).fetchall()}
 
+    # Yesterday's rank = monthly growth up to yesterday
     yesterday_diffs = []
     for pid, gp in yesterday_gp.items():
-        gp_prev = day_before_gp.get(pid, gp)
+        gp_prev = month_start_gp.get(pid, gp)
         yesterday_diffs.append((pid, gp - gp_prev))
 
     yesterday_diffs.sort(key=lambda x: x[1], reverse=True)
