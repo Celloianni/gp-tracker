@@ -600,9 +600,9 @@ function playerApp() {
     async loadYesterday() {
       this.loadingYesterday = true;
       try {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yStr = yesterday.toISOString().slice(0, 10);
+        const now = new Date();
+        const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        const yStr = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
         const r = await fetch(`/api/friends/roster_changes/${this.playerId}?date=${yStr}`);
         if (r.status === 401) { window.location.href = '/login'; return; }
         const data = await r.json();
