@@ -606,7 +606,7 @@ function playerApp() {
         const r = await fetch(`/api/friends/roster_changes/${this.playerId}?date=${yStr}`);
         if (r.status === 401) { window.location.href = '/login'; return; }
         const data = await r.json();
-        this.yesterdayChanges = (data.changes || []).filter(c => c.type === 'upgrade');
+        this.yesterdayChanges = (data.changes || []).filter(c => c.type === 'upgrade' || c.type === 'new');
       } catch(e) { console.error(e); }
       finally { this.loadingYesterday = false; }
     },
