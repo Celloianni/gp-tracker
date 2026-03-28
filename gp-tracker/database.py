@@ -162,8 +162,9 @@ def get_progress(guild_id: str):
 
 def get_monthly_progress(guild_id: str):
     """Get GP growth from 1st of current month to today for all players."""
-    from datetime import date
+    from datetime import date, timedelta
     today = str(date.today())
+    week_ago = str(date.today() - timedelta(days=7))
     month_start = today[:8] + "01"
 
     with get_conn() as conn:
@@ -194,6 +195,12 @@ def get_monthly_progress(guild_id: str):
                 (guild_id, first_date)
             ).fetchall()}
 
+        # Join dates: first ever snapshot per player in this guild
+        join_dates = {r[0]: r[1] for r in conn.execute("""
+            SELECT player_id, MIN(snapshot_date) FROM snapshots
+            WHERE guild_id = ? GROUP BY player_id
+        """, (guild_id,)).fetchall()}
+
         monthly_plan = int(get_setting("monthly_plan", "100000"))
 
         players_raw = []
@@ -209,6 +216,7 @@ def get_monthly_progress(guild_id: str):
                 "diff": diff,
                 "diff_pct": round(diff / gp_prev * 100, 2) if gp_prev > 0 else 0,
                 "plan_pct": round(diff / monthly_plan * 100, 1) if monthly_plan > 0 else 0,
+                "join_date": join_dates.get(pid),
             })
 
         players_raw.sort(key=lambda x: x["gp"], reverse=True)
@@ -224,6 +232,7 @@ def get_monthly_progress(guild_id: str):
             activity = get_activity_level(guild_id, p["id"])
             diff_rank = diff_ranks[p["id"]]
             rank_change = get_rank_change(guild_id, p["id"], diff_rank)
+            jd = p["join_date"]
             players.append({
                 "id": p["id"],
                 "name": p["name"],
@@ -236,6 +245,8 @@ def get_monthly_progress(guild_id: str):
                 "activity": activity,
                 "rank": diff_rank,
                 "rank_change": rank_change,
+                "join_date": jd,
+                "is_new": bool(jd and jd >= week_ago),
             })
 
         return {
@@ -256,6 +267,9 @@ def get_available_months(guild_id: str):
         return [r[0] for r in rows]
 
 def get_progress_for_month(guild_id: str, month: str):
+    from datetime import date, timedelta
+    today = str(date.today())
+    week_ago = str(date.today() - timedelta(days=7))
     with get_conn() as conn:
         # First snapshot of the month
         first_date = conn.execute("""
@@ -285,6 +299,12 @@ def get_progress_for_month(guild_id: str, month: str):
                 (guild_id, first_date)
             ).fetchall()}
 
+        # Join dates: first ever snapshot per player in this guild
+        join_dates = {r[0]: r[1] for r in conn.execute("""
+            SELECT player_id, MIN(snapshot_date) FROM snapshots
+            WHERE guild_id = ? GROUP BY player_id
+        """, (guild_id,)).fetchall()}
+
         monthly_plan = int(get_setting("monthly_plan", "100000"))
 
         players_raw = []
@@ -300,6 +320,7 @@ def get_progress_for_month(guild_id: str, month: str):
                 "diff": diff,
                 "diff_pct": round(diff / gp_prev * 100, 2) if gp_prev > 0 else 0,
                 "plan_pct": round(diff / monthly_plan * 100, 1) if monthly_plan > 0 else 0,
+                "join_date": join_dates.get(pid),
             })
 
         players_raw.sort(key=lambda x: x["gp"], reverse=True)
@@ -311,6 +332,7 @@ def get_progress_for_month(guild_id: str, month: str):
             activity = get_activity_level(guild_id, p["id"])
             rank = gp_ranks[p["id"]]
             rank_change = get_rank_change(guild_id, p["id"], rank)
+            jd = p["join_date"]
             players.append({
                 "id": p["id"],
                 "name": p["name"],
@@ -323,6 +345,8 @@ def get_progress_for_month(guild_id: str, month: str):
                 "activity": activity,
                 "rank": rank,
                 "rank_change": rank_change,
+                "join_date": jd,
+                "is_new": bool(jd and jd >= week_ago),
             })
 
         players.sort(key=lambda x: x["diff"], reverse=True)
