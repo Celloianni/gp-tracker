@@ -334,9 +334,9 @@
               <td class="gp" x-text="fmt(p.gp)"></td>
               <td class="diff" :class="p.diff>0?'pos':p.diff<0?'neg':'zero'">
                 <span x-text="(p.diff>0?'+':'')+fmt(p.diff)"></span>
-                <template x-if="p.daily_diff > 0">
-                  <span style="font-size:11px;margin-left:5px;color:#34d399;"
-                        x-text="'+'+fmt(p.daily_diff)"></span>
+                <template x-if="p.daily_diff && p.daily_diff !== 0">
+                  <span :style="'font-size:11px;margin-left:5px;color:'+(p.daily_diff>0?'#34d399':'#64748b')"
+                        x-text="(p.daily_diff>0?'+':'')+fmt(p.daily_diff)"></span>
                 </template>
               </td>
               <td :class="p.streak>0?'streak-pos':p.streak<0?'streak-neg':'streak-zero'" x-text="p.streak>0?'+'+p.streak+' days':p.streak<0?p.streak+' days':'—'"></td>
