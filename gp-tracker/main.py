@@ -392,28 +392,30 @@ async def collect(request: Request, auth: bool = Depends(check_auth)):
     return {"status": "started", "is_final": is_final}
 
 async def fetch_and_cache_unit_names():
-    """Fetch unit names + thumbnails from swgoh-utils gamedata on GitHub and cache in DB."""
-    LOC_URL = "https://raw.githubusercontent.com/swgoh-utils/gamedata/main/Loc_ENG_US.txt.json"
-    UNITS_URL = "https://raw.githubusercontent.com/swgoh-utils/gamedata/main/units.json"
-    print("Fetching unit names + thumbnails from swgoh-utils/gamedata GitHub...")
+    """Fetch unit names + thumbnails + ability names from swgoh-utils gamedata on GitHub and cache in DB."""
+    BASE = "https://raw.githubusercontent.com/swgoh-utils/gamedata/main/"
+    print("Fetching unit/ability names from swgoh-utils/gamedata GitHub...")
 
     known_ids = get_all_unit_ids()
-    print(f"  Found {len(known_ids)} unique unit IDs in roster snapshots")
+    ability_ids = get_all_ability_ids()
+    print(f"  Found {len(known_ids)} unit IDs, {len(ability_ids)} ability IDs")
 
-    async with httpx.AsyncClient(timeout=180) as client:
-        loc_r, units_r = await asyncio.gather(
-            client.get(LOC_URL),
-            client.get(UNITS_URL),
+    async with httpx.AsyncClient(timeout=300) as client:
+        loc_r, units_r, skill_r, ability_r = await asyncio.gather(
+            client.get(BASE + "Loc_ENG_US.txt.json"),
+            client.get(BASE + "units.json"),
+            client.get(BASE + "skill.json"),
+            client.get(BASE + "ability.json"),
         )
-        loc_r.raise_for_status()
-        units_r.raise_for_status()
+        for r in [loc_r, units_r, skill_r, ability_r]:
+            r.raise_for_status()
 
         loc_map = loc_r.json().get("data", {})
         print(f"  Loaded {len(loc_map)} localization strings")
 
-        # Build baseId → thumbnailName map from units.json
+        # Build baseId → metadata map from units.json
         units_data = units_r.json()
-        unit_meta = {}  # baseId -> {thumbnailName, combatType}
+        unit_meta = {}
         units_list = units_data if isinstance(units_data, list) else units_data.get("data", [])
         for u in units_list:
             base_id = u.get("baseId", "").upper()
@@ -424,7 +426,26 @@ async def fetch_and_cache_unit_names():
                 }
         print(f"  Loaded {len(unit_meta)} unit metadata entries")
 
+        # Build skill_id → ability name via chain:
+        # skill.json (id→abilityReference) → ability.json (id→nameKey) → Loc (nameKey→name)
+        skill_list = skill_r.json()
+        if isinstance(skill_list, dict): skill_list = skill_list.get("data", [])
+        ability_list = ability_r.json()
+        if isinstance(ability_list, dict): ability_list = ability_list.get("data", [])
+
+        ability_name_key = {a["id"]: a.get("nameKey", "") for a in ability_list}
+        skill_to_name = {}
+        for s in skill_list:
+            skill_id = s.get("id", "").upper()
+            ability_ref = s.get("abilityReference", "")
+            name_key = ability_name_key.get(ability_ref, "")
+            name = loc_map.get(name_key, "") if name_key else ""
+            if skill_id and name:
+                skill_to_name[skill_id] = name
+        print(f"  Built {len(skill_to_name)} skill name mappings")
+
         names_to_save = {}
+        # Unit names
         for unit_id in known_ids:
             name = loc_map.get(f"UNIT_{unit_id}_NAME", "") or unit_id
             meta = unit_meta.get(unit_id, {})
@@ -433,12 +454,9 @@ async def fetch_and_cache_unit_names():
                 "combat_type": meta.get("combatType", 1),
                 "thumbnail_name": meta.get("thumbnailName", ""),
             }
-
-        # Also load ability names using same localization file
-        ability_ids = get_all_ability_ids()
-        print(f"  Found {len(ability_ids)} unique ability IDs")
+        # Ability names via proper chain
         for ab_id in ability_ids:
-            name = loc_map.get(f"{ab_id.upper()}_NAME", "") or ab_id
+            name = skill_to_name.get(ab_id.upper(), "") or ab_id
             names_to_save[ab_id.upper()] = {"name": name, "combat_type": 0, "thumbnail_name": ""}
 
         save_unit_names(names_to_save)

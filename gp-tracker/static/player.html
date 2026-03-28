@@ -515,14 +515,14 @@ function playerApp() {
         return `${fromR} → ${toR}`;
       }
       if (c.field === 'ability') {
-        const type = this.abilityType(c.ability_id);
+        const name = c.ability_name && !c.ability_name.includes('skill_') ? c.ability_name : this.abilityType(c.ability_id);
         const zeta = c.is_zeta ? ' Ω' : '';
-        return `${type}${zeta} ${c.from}→${c.to}`;
+        return `${name}${zeta} ${c.from}→${c.to}`;
       }
       if (c.field === 'ability_new') {
-        const type = this.abilityType(c.ability_id);
+        const name = c.ability_name && !c.ability_name.includes('skill_') ? c.ability_name : this.abilityType(c.ability_id);
         const zeta = c.is_zeta ? ' Ω' : '';
-        return `${type}${zeta}: new (Tier ${c.tier})`;
+        return `${name}${zeta}: new`;
       }
       return `${c.field}: ${c.from} → ${c.to}`;
     },
@@ -642,7 +642,8 @@ function playerApp() {
         const main = changes.find(x => x.field === 'relic_tier')
                   || changes.find(x => x.field === 'gear_tier')
                   || changes.find(x => x.field === 'level')
-                  || changes.find(x => x.field === 'stars');
+                  || changes.find(x => x.field === 'stars')
+                  || changes.find(x => x.field === 'ability' || x.field === 'ability_new');
         if (!main) return null;
         const label = this.formatChangeLabel(main);
         return `<span>${c.name} <b style="color:#34d399">${label}</b></span>`;
@@ -689,14 +690,14 @@ function playerApp() {
       if (c.field === 'stars')  return s(`${c.from}⭐ → ${c.to}⭐`, '#fbbf24');
       if (c.field === 'level')  return s(`Lvl ${c.from} → ${c.to}`, '#94a3b8');
       if (c.field === 'ability') {
-        const type = this.abilityType(c.ability_id);
+        const name = c.ability_name && !c.ability_name.includes('skill_') ? c.ability_name : this.abilityType(c.ability_id);
         const zeta = c.is_zeta ? ' Ω' : '';
-        return s(`${type}${zeta} ${c.from}→${c.to}`, '#60a5fa');
+        return s(`${name}${zeta} ${c.from}→${c.to}`, '#60a5fa');
       }
       if (c.field === 'ability_new') {
-        const type = this.abilityType(c.ability_id);
+        const name = c.ability_name && !c.ability_name.includes('skill_') ? c.ability_name : this.abilityType(c.ability_id);
         const zeta = c.is_zeta ? ' Ω' : '';
-        return s(`${type}${zeta} Tier ${c.tier}`, '#60a5fa');
+        return s(`${name}${zeta}: new`, '#60a5fa');
       }
       return `${c.field}: ${c.from} → ${c.to}`;
     },
@@ -718,6 +719,8 @@ function playerApp() {
       if (gear)   parts.push(this.formatChangeLabelHtml(gear));
       if (level)  parts.push(this.formatChangeLabelHtml(level));
       if (stars)  parts.push(this.formatChangeLabelHtml(stars));
+      if (skills.length === 1) parts.push(this.formatChangeLabelHtml(skills[0]));
+      else if (skills.length > 1) parts.push(`<span style="color:#60a5fa">+${skills.length} skills</span>`);
 
       return parts.join(', ');
     },
