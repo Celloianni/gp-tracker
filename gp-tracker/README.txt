@@ -1,7 +1,7 @@
 ================================================================================
   GP TRACKER — ДОКУМЕНТАЦІЯ ПРОЄКТУ
 ================================================================================
-Останнє оновлення: 28 березня 2026 (8)
+Останнє оновлення: 28 березня 2026 (9)
 
 --------------------------------------------------------------------------------
   ЩО ЦЕ ТАКЕ
@@ -168,9 +168,10 @@ Star Wars: Galaxy of Heroes (SWGOH).
   — ⚠️ Unit names not loaded — перейти в ⚙ на головній для завантаження
 
   Блок "UPGRADED YESTERDAY":
-  — Картки персонажів прокачаних вчора (тільки upgrade, без NEW)
+  — Картки персонажів прокачаних вчора: апгрейди + нові юніти (NEW)
   — Кожна картка: іконка + назва + опис змін (R8→R9, G12→G13 тощо)
   — Якщо нічого не прокачував → "No upgrades yesterday"
+  — Порівнює останній знімок вчорашнього дня з позавчорашнім
 
   Блок "MARCH 2026" (календар поточного місяця):
   — Сітка 7 колонок (Mon-Sun), один рядок = один тиждень
@@ -297,5 +298,42 @@ Star Wars: Galaxy of Heroes (SWGOH).
   — Рівень relic у comlink: stored_value - 2 = реальний R-рівень
     (stored 11 = R9, stored 12 = R10, stored 3 = R1 тощо)
   — Датакрони не впливають на GP і не відстежуються.
+  — Ростер та сторінка гравця — тільки для друзів (не для гільдій).
+
+--------------------------------------------------------------------------------
+  ЗМІНИ (CODE AUDIT — 28.03.2026)
+--------------------------------------------------------------------------------
+  Проведено повний аудит коду. Виправлено:
+
+  database.py:
+  — Всі виклики date.today() замінені на today_kyiv() через zoneinfo —
+    раніше використовувався UTC, що давало неправильну дату між 00:00-02:59 Kyiv
+  — get_friends_history: фільтр по allyCode замість playerId — дані
+    зберігаються з внутрішнім playerId, тому графік GP History був завжди
+    порожній. Фіксовано: повертаються всі записи guild_id='friends'
+  — get_progress_for_month: не повертав monthly_plan — при перегляді
+    старого місяця Plan% міг показувати некоректно
+  — get_activity_level: тепер використовує is_final=1 знімки (як get_streak)
+  — get_roster_changes_for_month: loop var 'date' затіняв stdlib import,
+    перейменовано на date_str
+  — get_monthly_achievements: date.today() → datetime.now(Kyiv).date()
+
+  main.py:
+  — fetch_guild: is_final більше не береться з глобального collection_status,
+    а передається прямим параметром — усунено потенційний race condition
+  — /api/collect: тепер приймає is_final в body (раніше завжди False)
+  — save_roster_snapshot: дата теж у Kyiv timezone
+  — fetch_all: прибрано collection_status["is_final"] зі словника
+
+  static/index.html:
+  — Poll loop при зборі: більше не зависає вічно якщо бекенд впав —
+    додано fallback: resolve після 3 неактивних циклів поспіль
+  — friendsChart30: toISOString() → local date parts (UTC timezone bug)
+  — savePlan: додано обробку помилок при non-OK відповіді від API
+
+  static/player.html:
+  — loadYesterday: toISOString() → local date parts (UTC timezone bug)
+  — Блок "Upgraded Yesterday": тепер показує і нові юніти (type=new),
+    раніше тільки апгрейди (type=upgrade)
 
 ================================================================================
