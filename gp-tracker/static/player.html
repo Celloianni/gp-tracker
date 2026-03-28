@@ -636,18 +636,20 @@ function playerApp() {
 
     calCellText(cell) {
       if (!cell || !cell.hasPrev || cell.changes.length === 0) return '';
-      return cell.changes.slice(0, 4).map(c => {
+      const lines = cell.changes.map(c => {
         if (c.type === 'new') return `<span>${c.name} <b style="color:#34d399">NEW</b></span>`;
         const changes = c.changes || [];
         const main = changes.find(x => x.field === 'relic_tier')
                   || changes.find(x => x.field === 'gear_tier')
                   || changes.find(x => x.field === 'level')
-                  || changes.find(x => x.field === 'stars')
-                  || changes[0];
-        if (!main) return `<span>${c.name}</span>`;
+                  || changes.find(x => x.field === 'stars');
+        if (!main) return null;
         const label = this.formatChangeLabel(main);
         return `<span>${c.name} <b style="color:#34d399">${label}</b></span>`;
-      }).join('<br>') + (cell.changes.length > 4 ? `<br><span style="color:#64748b">+${cell.changes.length - 4} more</span>` : '');
+      }).filter(x => x !== null);
+      const visible = lines.slice(0, 4);
+      const extra = lines.length > 4 ? `<br><span style="color:#64748b">+${lines.length - 4} more</span>` : '';
+      return visible.join('<br>') + extra;
     },
 
     gearTierColor(tier) {
@@ -716,8 +718,6 @@ function playerApp() {
       if (gear)   parts.push(this.formatChangeLabelHtml(gear));
       if (level)  parts.push(this.formatChangeLabelHtml(level));
       if (stars)  parts.push(this.formatChangeLabelHtml(stars));
-      if (skills.length === 1) parts.push(this.formatChangeLabelHtml(skills[0]));
-      else if (skills.length > 1) parts.push(s(`+${skills.length} skills`, '#60a5fa'));
 
       return parts.join(', ');
     },
