@@ -351,7 +351,7 @@
   </div>
 
   <!-- GP History Chart -->
-  <div class="section" x-show="historyLoaded">
+  <div class="section" x-show="historyLoaded" x-cloak>
     <div class="section-title">GP History</div>
     <div class="chart-wrap">
       <canvas id="gpChart" height="200"></canvas>
@@ -486,6 +486,7 @@ function playerApp() {
         this.historyLoaded = true;
 
         await this.$nextTick();
+        await new Promise(r => setTimeout(r, 0));
         const ctx = document.getElementById('gpChart');
         if (!ctx) return;
         if (this.gpChart) this.gpChart.destroy();
