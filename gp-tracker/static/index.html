@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GP Tracker — Guild Progress</title>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
@@ -73,8 +72,6 @@
   .streak-pos { color: #34d399; font-size: 13px; }
   .streak-neg { color: #f87171; font-size: 13px; }
   .streak-zero { color: #64748b; font-size: 13px; }
-  .chart-wrap { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 24px; }
-  .chart-title { font-size: 14px; font-weight: 500; color: #94a3b8; margin-bottom: 20px; }
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
   .modal { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 16px; padding: 28px; width: 340px; }
   .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #e2e8f0; }
@@ -254,10 +251,6 @@
       </div>
     </div>
 
-    <div class="chart-wrap" x-show="friendsHistory.length > 0">
-      <div class="chart-title">GP growth over time</div>
-      <canvas id="friendsChart" height="100"></canvas>
-    </div>
   </div>
 
   <!-- Guild tab -->
@@ -351,17 +344,12 @@
 </div>
 
 <script>
-const COLORS = ['#a78bfa','#34d399','#f59e0b','#f87171','#60a5fa','#fb923c'];
-
-let chartInstance = null;
-
 function tracker() {
   return {
     guilds: [],
     activeTab: 'friends',
     guildData: {},
     friendsData: {},
-    friendsHistory: [],
     loadingGuild: false,
     loadingFriends: true,
     collecting: false,
@@ -427,17 +415,14 @@ function tracker() {
         const progUrl = this.friendsMonth
           ? `/api/progress/friends?month=${this.friendsMonth}`
           : '/api/progress/friends';
-        const [progR, histR, achR] = await Promise.all([
+        const [progR, achR] = await Promise.all([
           fetch(progUrl),
-          fetch('/api/friends/history'),
           fetch('/api/friends/achievements')
         ]);
         if (progR.status === 401) { window.location.href = '/login'; return; }
-        const [prog, hist, ach] = await Promise.all([progR.json(), histR.json(), achR.json()]);
+        const [prog, ach] = await Promise.all([progR.json(), achR.json()]);
         this.friendsData = prog;
-        this.friendsHistory = hist;
         this.friendsAchievements = ach;
-        this.$nextTick(() => this.renderChart());
       } catch(e) { console.error(e); }
       finally { if (showLoading) this.loadingFriends = false; }
     },
@@ -456,48 +441,6 @@ function tracker() {
         if (monthsR) this.guildMonths = await monthsR.json();
       } catch(e) { console.error(e); }
       finally { if (showLoading) this.loadingGuild = false; }
-    },
-
-    renderChart() {
-      const ctx = document.getElementById('friendsChart');
-      if (!ctx || !this.friendsHistory.length) return;
-      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
-      const allDates = [...new Set(this.friendsHistory.flatMap(p => p.history.map(h => h.date)))].sort();
-      const datasets = this.friendsHistory.map((player, i) => {
-        const gpMap = Object.fromEntries(player.history.map(h => [h.date, h.gp]));
-        return {
-          label: player.name,
-          data: allDates.map(d => gpMap[d] || null),
-          borderColor: COLORS[i % COLORS.length],
-          backgroundColor: COLORS[i % COLORS.length] + '22',
-          tension: 0.3,
-          pointRadius: 4,
-          spanGaps: true,
-        };
-      });
-      chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: { labels: allDates, datasets },
-        options: {
-          responsive: true,
-          interaction: { mode: 'index', intersect: false },
-          plugins: {
-            legend: { labels: { color: '#94a3b8', font: { size: 12 } } },
-            tooltip: {
-              callbacks: {
-                label: ctx => ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString('en-US')}`
-              }
-            }
-          },
-          scales: {
-            x: { ticks: { color: '#64748b' }, grid: { color: '#1e2235' } },
-            y: {
-              ticks: { color: '#64748b', callback: v => (v/1e6).toFixed(1)+'M' },
-              grid: { color: '#1e2235' }
-            }
-          }
-        }
-      });
     },
 
     async collect() {
@@ -541,43 +484,6 @@ function tracker() {
         await this.autoRefresh();
       } catch(e) { console.error(e); }
       finally { this.collecting = false; this.progressPct = 0; }
-    },
-
-    friendsChart30() {
-      const players = this.friendsData.players || [];
-      if (!players.length) return [];
-
-      // Calculate 30-day growth from history
-      const result = players.map(p => {
-        const hist = (this.friendsHistory || []).find(h => h.name === p.name);
-        let growth = 0;
-        if (hist && hist.history.length >= 2) {
-          const sorted = [...hist.history].sort((a, b) => a.date.localeCompare(b.date));
-          const latest = sorted[sorted.length - 1];
-          // Find closest to 30 days ago
-          const now = new Date(latest.date);
-          const target = new Date(now);
-          target.setDate(target.getDate() - 30);
-          const targetStr = `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
-          const older = sorted.filter(h => h.date <= targetStr);
-          const base = older.length ? older[older.length - 1] : sorted[0];
-          growth = latest.gp - base.gp;
-        } else {
-          growth = p.diff || 0;
-        }
-        return { name: p.name, growth: Math.max(0, growth) };
-      });
-
-      const max = Math.max(...result.map(r => r.growth), 1);
-      const colors = ['#a78bfa','#f87171','#60a5fa','#34d399','#fbbf24','#f472b6'];
-
-      return result
-        .sort((a, b) => b.growth - a.growth)
-        .map((r, i) => ({
-          ...r,
-          pct: Math.max(r.growth > 0 ? 2 : 0.5, (r.growth / max) * 100),
-          color: colors[i % colors.length]
-        }));
     },
 
     friendsSorted() {
