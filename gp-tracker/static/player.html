@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GP Tracker — Player</title>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
@@ -33,7 +32,6 @@
   .change-detail .arrow { color: #34d399; margin: 0 4px; }
   .change-detail .new-badge { background: #065f46; color: #34d399; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
   .empty-changes { text-align: center; padding: 40px; color: #64748b; }
-  .chart-wrap { }
   .loading { text-align: center; padding: 60px; color: #64748b; }
   .stars { color: #fbbf24; font-size: 12px; }
   .relic-badge { background: #1e1b4b; color: #a78bfa; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
@@ -350,13 +348,6 @@
     </div>
   </div>
 
-  <!-- GP History Chart -->
-  <div class="section" x-show="historyLoaded" x-cloak>
-    <div class="section-title">GP History</div>
-    <div class="chart-wrap">
-      <canvas id="gpChart" height="200"></canvas>
-    </div>
-  </div>
 
 </div>
 
@@ -373,10 +364,8 @@ function playerApp() {
     dateIndex: 0,
     changesData: { date: null, prev_date: null, changes: [] },
     loadingChanges: false,
-    historyLoaded: false,
     unitNamesCount: null,
 
-    gpChart: null,
     yesterdayChanges: [],
     loadingYesterday: false,
     calMonth: '',
@@ -435,9 +424,6 @@ function playerApp() {
         }
       }
 
-      // Load GP history for chart
-      await this.loadHistory();
-
       await this.loadYesterday();
       this.initCalendar();
       await this.loadMonthData();
@@ -469,70 +455,6 @@ function playerApp() {
         this.selectedDate = this.availableDates[this.dateIndex];
         this.loadChanges();
       }
-    },
-
-    async loadHistory() {
-      try {
-        const r = await fetch('/api/friends/history');
-        if (!r.ok) return;
-        const allPlayers = await r.json();
-        const player = allPlayers.find(p => p.history && p.history.length > 0 && p.name === this.playerName);
-        if (!player) return;
-
-        const labels = player.history.map(h => h.date);
-        const data = player.history.map(h => h.gp);
-
-        this.currentGp = data[data.length - 1] || 0;
-        this.historyLoaded = true;
-
-        await this.$nextTick();
-        await new Promise(r => setTimeout(r, 0));
-        const ctx = document.getElementById('gpChart');
-        if (!ctx) return;
-        if (this.gpChart) this.gpChart.destroy();
-        this.gpChart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label: this.playerName,
-              data,
-              borderColor: '#7c3aed',
-              backgroundColor: 'rgba(124,58,237,0.1)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.3,
-              pointRadius: 3,
-              pointHoverRadius: 5,
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  label: ctx => ctx.parsed.y.toLocaleString() + ' GP'
-                }
-              }
-            },
-            scales: {
-              x: {
-                ticks: { color: '#64748b', font: { size: 11 }, maxTicksLimit: 8 },
-                grid: { color: '#1e2235' }
-              },
-              y: {
-                ticks: {
-                  color: '#64748b',
-                  font: { size: 11 },
-                  callback: v => (v / 1000000).toFixed(1) + 'M'
-                },
-                grid: { color: '#1e2235' }
-              }
-            }
-          }
-        });
-      } catch(e) { console.error(e); }
     },
 
 
