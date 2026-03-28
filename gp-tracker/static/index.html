@@ -200,7 +200,7 @@
             <th @click="friendsSort('name')" :class="friendsSortKey==='name'?'sorted':''">Player</th>
             <th @click="friendsSort('gp')" :class="friendsSortKey==='gp'?'sorted':''">GP now</th>
             <th @click="friendsSort('diff')" :class="friendsSortKey==='diff'?'sorted':''">GP growth</th>
-            <th @click="friendsSort('streak')" :class="friendsSortKey==='streak'?'sorted':''">Streak</th>
+            <th>7 days</th>
             <th @click="friendsSort('plan_pct')" :class="friendsSortKey==='plan_pct'?'sorted':''" x-text="'Plan ' + fmt(monthlyPlan)">Plan</th>
           </tr>
         </thead>
@@ -233,10 +233,12 @@
                         x-text="(p.daily_diff>0?'+':'')+fmt(p.daily_diff)"></span>
                 </template>
               </td>
-              <td :class="p.streak>0?'streak-pos':p.streak<0?'streak-neg':'streak-zero'" style="white-space:nowrap;">
-                <span x-text="p.streak>0?'+'+p.streak+' days':p.streak<0?p.streak+' days':'—'"></span>
-                <template x-if="p.streak >= 7"><span class="achievement" style="margin-left:3px;">🔥<span class="tip">Стрік +7 днів поспіль!</span></span></template>
-                <template x-if="p.streak <= -3"><span class="achievement" style="margin-left:3px;">🥶<span class="tip">Стрік -3 дні і нижче</span></span></template>
+              <td>
+                <div style="display:flex;align-items:flex-end;gap:2px;height:16px;">
+                  <template x-for="(bar, i) in (p.days_7 || [])" :key="i">
+                    <div :style="'width:5px;border-radius:2px;background:' + (bar>0?'#34d399':bar<0?'#ef4444':'#1e2235') + ';height:' + (bar>0?'100%':bar<0?'55%':'25%')"></div>
+                  </template>
+                </div>
               </td>
               <td style="text-align:center;"><span :class="planPctClass(p.plan_pct)" x-text="p.plan_pct > 0 ? p.plan_pct + '%' : '—'"></span></td>
             </tr>
@@ -304,7 +306,7 @@
             <th @click="sort('name')" :class="sortKey==='name'?'sorted':''">Player</th>
             <th @click="sort('gp')" :class="sortKey==='gp'?'sorted':''">GP now</th>
             <th @click="sort('diff')" :class="sortKey==='diff'?'sorted':''">GP growth</th>
-            <th @click="sort('streak')" :class="sortKey==='streak'?'sorted':''">Streak</th>
+            <th>7 days</th>
             <th @click="sort('plan_pct')" :class="sortKey==='plan_pct'?'sorted':''" x-text="'Plan ' + fmt(monthlyPlan)">Plan</th>
           </tr>
         </thead>
@@ -338,7 +340,13 @@
                         x-text="(p.daily_diff>0?'+':'')+fmt(p.daily_diff)"></span>
                 </template>
               </td>
-              <td :class="p.streak>0?'streak-pos':p.streak<0?'streak-neg':'streak-zero'" x-text="p.streak>0?'+'+p.streak+' days':p.streak<0?p.streak+' days':'—'"></td>
+              <td>
+                <div style="display:flex;align-items:flex-end;gap:2px;height:16px;">
+                  <template x-for="(bar, i) in (p.days_7 || [])" :key="i">
+                    <div :style="'width:5px;border-radius:2px;background:' + (bar>0?'#34d399':bar<0?'#ef4444':'#1e2235') + ';height:' + (bar>0?'100%':bar<0?'55%':'25%')"></div>
+                  </template>
+                </div>
+              </td>
               <td style="text-align:center;"><span :class="planPctClass(p.plan_pct)" x-text="p.plan_pct > 0 ? p.plan_pct + '%' : '—'"></span></td>
             </tr>
           </template>

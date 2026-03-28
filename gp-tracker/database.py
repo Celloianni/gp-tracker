@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 DB_PATH = "/data/gp_tracker.db"
@@ -140,6 +140,7 @@ def get_progress(guild_id: str):
         # Sort by diff to get diff ranks
         players_raw.sort(key=lambda x: x["diff"], reverse=True)
         diff_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
+        bars_map = get_7day_bars(guild_id)
 
         players = []
         for p in players_raw:
@@ -157,6 +158,7 @@ def get_progress(guild_id: str):
                 "activity": activity,
                 "rank": diff_rank,
                 "rank_change": rank_change,
+                "days_7": bars_map.get(p["id"], []),
             })
 
         return {
@@ -250,6 +252,7 @@ def get_monthly_progress(guild_id: str):
         # Sort by diff to get diff ranks
         players_raw.sort(key=lambda x: x["diff"], reverse=True)
         diff_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
+        bars_map = get_7day_bars(guild_id)
 
         players = []
         for p in players_raw:
@@ -273,6 +276,7 @@ def get_monthly_progress(guild_id: str):
                 "rank_change": rank_change,
                 "join_date": jd,
                 "is_new": bool(jd and jd >= week_ago and jd > guild_first_date),
+                "days_7": bars_map.get(p["id"], []),
             })
 
         return {
@@ -356,6 +360,7 @@ def get_progress_for_month(guild_id: str, month: str):
 
         players_raw.sort(key=lambda x: x["diff"], reverse=True)
         diff_ranks = {p["id"]: i+1 for i, p in enumerate(players_raw)}
+        bars_map = get_7day_bars(guild_id)
 
         players = []
         for p in players_raw:
@@ -378,6 +383,7 @@ def get_progress_for_month(guild_id: str, month: str):
                 "rank_change": rank_change,
                 "join_date": jd,
                 "is_new": bool(jd and jd >= week_ago and jd > guild_first_date),
+                "days_7": bars_map.get(p["id"], []),
             })
 
         players.sort(key=lambda x: x["diff"], reverse=True)
@@ -477,6 +483,38 @@ def get_activity_level(guild_id: str, player_id: str) -> int:
             level = max(1, level - 1)
 
     return level
+
+def get_7day_bars(guild_id: str) -> dict:
+    """Returns last 7 days GP activity for all players in guild.
+    Result: player_id → list of 7 ints: 1=positive, -1=negative/zero, 0=no data."""
+    today_date = datetime.now(_KYIV).date()
+    start_date = str(today_date - timedelta(days=8))
+    dates = [(today_date - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(8, -1, -1)]
+
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT player_id, snapshot_date, MAX(gp) as gp
+            FROM snapshots
+            WHERE guild_id = ? AND snapshot_date >= ?
+            GROUP BY player_id, snapshot_date
+        """, (guild_id, start_date)).fetchall()
+
+    by_player = {}
+    for pid, d, gp in rows:
+        by_player.setdefault(pid, {})[d] = gp
+
+    result = {}
+    for pid, snap_map in by_player.items():
+        bars = []
+        for i in range(1, len(dates)):
+            d_curr, d_prev = dates[i], dates[i - 1]
+            if d_curr in snap_map and d_prev in snap_map:
+                diff = snap_map[d_curr] - snap_map[d_prev]
+                bars.append(1 if diff > 0 else -1)
+            else:
+                bars.append(0)
+        result[pid] = bars[-7:]
+    return result
 
 def get_rank_change(guild_id: str, player_id: str, current_diff_rank: int):
     """Compare GP Growth rank today vs yesterday, both measured from start of month."""
