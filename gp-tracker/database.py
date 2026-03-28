@@ -395,7 +395,7 @@ def set_setting(key: str, value: str):
 
 def get_streak(guild_id: str, player_id: str):
     """Count consecutive days of positive/negative GP growth.
-    Uses only is_final=1 snapshots (23:59 updates) when available,
+    Uses only is_final=1 snapshots (00:00 updates) when available,
     falls back to all snapshots for older data.
     Today's non-final snapshot is always excluded to avoid breaking
     streaks before the day is complete."""
