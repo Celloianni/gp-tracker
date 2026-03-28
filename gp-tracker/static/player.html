@@ -144,14 +144,10 @@
     <!-- GP Growth -->
     <div class="stats-cell">
       <div class="stats-label">GP Growth</div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="stats-value"
+      <div class="stats-value"
           :class="playerStats && playerStats.diff >= 0 ? 'green' : 'red'"
           x-text="playerStats ? (playerStats.diff >= 0 ? '+' : '') + playerStats.diff.toLocaleString() : ''">
         </div>
-        <span x-show="playerStats && (playerStats.days_7||[]).length===7 && (playerStats.days_7||[]).every(b=>b>0)" style="font-size:20px;" title="7 days green!">🔥</span>
-        <span x-show="playerStats && (playerStats.days_7||[]).length===7 && (playerStats.days_7||[]).every(b=>b<0)" style="font-size:20px;" title="7 days red">🥶</span>
-      </div>
     </div>
     <!-- Plan % -->
     <div class="stats-cell" x-show="playerStats && playerStats.plan_pct !== undefined">
