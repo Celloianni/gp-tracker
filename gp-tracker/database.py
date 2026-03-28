@@ -450,13 +450,20 @@ def get_activity_level(guild_id: str, player_id: str) -> int:
     Each day of positive GP growth: +1 level (max 10)
     Each day of negative/zero GP growth: -1 level (min 1)
     Starts at level 1 if no data.
+    Uses is_final=1 snapshots when available, falls back to all snapshots.
     """
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT snapshot_date, gp FROM snapshots
-            WHERE guild_id = ? AND player_id = ?
+            WHERE guild_id = ? AND player_id = ? AND is_final = 1
             ORDER BY snapshot_date ASC
         """, (guild_id, player_id)).fetchall()
+        if len(rows) < 2:
+            rows = conn.execute("""
+                SELECT snapshot_date, gp FROM snapshots
+                WHERE guild_id = ? AND player_id = ?
+                ORDER BY snapshot_date ASC
+            """, (guild_id, player_id)).fetchall()
 
     if len(rows) < 2:
         return 1
@@ -807,18 +814,18 @@ def get_roster_changes_for_month(player_id: str, year_month: str) -> dict:
     month_dates = [d for d in all_dates if d.startswith(year_month)]
 
     result = {}
-    for date in month_dates:
-        prev_dates = [d for d in all_dates if d < date]
+    for date_str in month_dates:
+        prev_dates = [d for d in all_dates if d < date_str]
         prev_date = prev_dates[-1] if prev_dates else None
         if prev_date:
-            changes_data = get_roster_changes(player_id, date)
-            result[date] = {
+            changes_data = get_roster_changes(player_id, date_str)
+            result[date_str] = {
                 "has_snapshot": True,
                 "has_prev": True,
                 "changes": changes_data["changes"]
             }
         else:
-            result[date] = {
+            result[date_str] = {
                 "has_snapshot": True,
                 "has_prev": False,
                 "changes": []

@@ -211,7 +211,7 @@ async def fetch_friends(is_final: bool = False):
             save_snapshot("friends", players, is_final=is_final)
             print(f"  Saved {len(players)} friends.")
 
-async def fetch_guild(client, guild):
+async def fetch_guild(client, guild, is_final: bool = False):
     global collection_status
     guild_id = guild["id"]
     guild_name = guild["name"]
@@ -256,7 +256,7 @@ async def fetch_guild(client, guild):
 
     players_with_gp = [p for p in players if p["gp"] > 0]
     if players_with_gp:
-        save_snapshot(guild_id, players_with_gp, is_final=collection_status.get("is_final", False))
+        save_snapshot(guild_id, players_with_gp, is_final=is_final)
         print(f"  Saved {len(players_with_gp)} players for {guild_name}")
 
 async def fetch_all(is_final: bool = False):
@@ -267,12 +267,11 @@ async def fetch_all(is_final: bool = False):
     collection_status["done"] = 0
     collection_status["total"] = estimated_total
     collection_status["current"] = ""
-    collection_status["is_final"] = is_final
     print(f"[{date.today()}] Starting full data collection... (final={is_final})")
     await fetch_friends(is_final=is_final)
     async with httpx.AsyncClient(timeout=120) as client:
         for guild in GUILDS:
-            await fetch_guild(client, guild)
+            await fetch_guild(client, guild, is_final=is_final)
     collection_status["running"] = False
     collection_status["current"] = "Done"
     collection_status["done"] = collection_status["total"]
@@ -388,8 +387,9 @@ async def collect(request: Request, auth: bool = Depends(check_auth)):
     body = await request.json()
     if body.get("password") != COLLECT_PASSWORD:
         raise HTTPException(status_code=401, detail="Wrong password")
-    asyncio.create_task(fetch_all())
-    return {"status": "started"}
+    is_final = bool(body.get("is_final", False))
+    asyncio.create_task(fetch_all(is_final=is_final))
+    return {"status": "started", "is_final": is_final}
 
 async def fetch_and_cache_unit_names():
     """Fetch unit names + thumbnails from swgoh-utils gamedata on GitHub and cache in DB."""
