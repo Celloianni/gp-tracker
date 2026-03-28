@@ -74,13 +74,12 @@
   .picker-month:hover:not(.disabled) { border-color: #7c3aed; color: #a78bfa; background: #1e1b4b; }
   .picker-month.active { background: #7c3aed; border-color: #7c3aed; color: white; }
   .picker-month.disabled { opacity: 0.3; cursor: not-allowed; }
-  /* Unit cards for "Upgraded Yesterday" */
   .unit-cards-grid { display: flex; flex-wrap: wrap; gap: 12px; }
   .unit-card { background: #141625; border: 1px solid #2d3148; border-radius: 10px; padding: 12px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 110px; text-align: center; }
   .unit-card img { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: #333; }
   .unit-card-icon { width: 56px; height: 56px; border-radius: 8px; background: #1e2235; display: flex; align-items: center; justify-content: center; font-size: 24px; }
   .unit-card-name { font-size: 11px; color: #e2e8f0; font-weight: 500; line-height: 1.3; }
-  .unit-card-change { font-size: 11px; color: #34d399; }
+  .unit-card-change { font-size: 11px; font-weight: 600; }
   /* Calendar */
   .cal-month-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
   .cal-month-nav select { background: #141625; border: 1px solid #2d3148; border-radius: 8px; padding: 5px 10px; color: #e2e8f0; font-size: 13px; outline: none; cursor: pointer; }
@@ -180,30 +179,6 @@
     </div>
   </div>
 
-  <!-- Upgraded Yesterday -->
-  <div class="section">
-    <div class="section-title">Upgraded Yesterday</div>
-    <div x-show="loadingYesterday" class="loading" style="padding:30px">
-      <div style="display:inline-flex;align-items:center;gap:8px"><div class="spinner"></div> Loading...</div>
-    </div>
-    <div x-show="!loadingYesterday && yesterdayChanges.length === 0" class="empty-changes" style="padding:20px">
-      No upgrades yesterday
-    </div>
-    <div class="unit-cards-grid" x-show="!loadingYesterday && yesterdayChanges.length > 0">
-      <template x-for="change in yesterdayChanges" :key="change.unit_id">
-        <div class="unit-card">
-          <template x-if="change.thumbnail_url">
-            <img :src="change.thumbnail_url" :alt="change.name" @error="$el.style.display='none'">
-          </template>
-          <template x-if="!change.thumbnail_url">
-            <div class="unit-card-icon" x-text="change.combat_type === 2 ? '🚀' : '⚔️'"></div>
-          </template>
-          <div class="unit-card-name" x-text="change.name"></div>
-          <div class="unit-card-change" x-text="formatCardChange(change)"></div>
-        </div>
-      </template>
-    </div>
-  </div>
 
   <!-- Calendar -->
   <div class="section">
@@ -282,7 +257,7 @@
             <div class="unit-card-icon" x-text="change.combat_type === 2 ? '🚀' : '⚔️'"></div>
           </template>
           <div class="unit-card-name" x-text="change.name"></div>
-          <div class="unit-card-change" x-text="formatCardChange(change)"></div>
+          <div class="unit-card-change" :style="'color:' + cardChangeColor(change)" x-text="formatCardChange(change)"></div>
         </div>
       </template>
     </div>
@@ -392,8 +367,6 @@ function playerApp() {
     loadingChanges: false,
     unitNamesCount: null,
 
-    yesterdayChanges: [],
-    loadingYesterday: false,
     calMonth: '',
     availableCalMonths: [],
     monthData: {},
@@ -454,7 +427,6 @@ function playerApp() {
         }
       }
 
-      await this.loadYesterday();
       this.initCalendar();
       await Promise.all([this.loadMonthData(), this.loadMonthSummary()]);
     },
@@ -550,20 +522,6 @@ function playerApp() {
       return `${c.field}: ${c.from} → ${c.to}`;
     },
 
-    async loadYesterday() {
-      this.loadingYesterday = true;
-      try {
-        const now = new Date();
-        const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-        const yStr = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
-        const r = await fetch(`/api/friends/roster_changes/${this.playerId}?date=${yStr}`);
-        if (r.status === 401) { window.location.href = '/login'; return; }
-        const data = await r.json();
-        if (!data.prev_date) { this.yesterdayChanges = []; return; }
-        this.yesterdayChanges = (data.changes || []).filter(c => c.type === 'upgrade' || c.type === 'new');
-      } catch(e) { console.error(e); }
-      finally { this.loadingYesterday = false; }
-    },
 
     initCalendar() {
       const today = new Date();
@@ -685,6 +643,17 @@ function playerApp() {
       if (change.type === 'new') return 'NEW';
       if (!change.changes || change.changes.length === 0) return '';
       return change.changes.map(c => this.formatChangeLabel(c)).join(', ');
+    },
+
+    cardChangeColor(change) {
+      if (change.type === 'new') return '#34d399';           // зелений — новий юніт
+      const fields = (change.changes || []).map(c => c.field);
+      if (fields.includes('relic_tier'))  return '#a78bfa';  // фіолетовий — relic
+      if (fields.includes('gear_tier'))   return '#fbbf24';  // золотий — gear
+      if (fields.includes('stars'))       return '#f59e0b';  // жовтий — зірки
+      if (fields.some(f => f.startsWith('ability'))) return '#60a5fa'; // блакитний — ability
+      if (fields.includes('level'))       return '#94a3b8';  // сірий — level
+      return '#34d399';
     },
 
     downloadMonth() {
