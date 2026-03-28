@@ -206,6 +206,18 @@ def get_monthly_progress(guild_id: str):
             WHERE guild_id = ? GROUP BY player_id
         """, (guild_id,)).fetchall()}
 
+        # Previous snapshot (for daily diff — change since last cron)
+        prev_snapshot_date = conn.execute("""
+            SELECT MAX(snapshot_date) FROM snapshots
+            WHERE guild_id = ? AND snapshot_date < ?
+        """, (guild_id, last_date)).fetchone()[0]
+        prev_snapshot_gp = {}
+        if prev_snapshot_date:
+            prev_snapshot_gp = {r[0]: r[1] for r in conn.execute(
+                "SELECT player_id, gp FROM snapshots WHERE guild_id = ? AND snapshot_date = ?",
+                (guild_id, prev_snapshot_date)
+            ).fetchall()}
+
         monthly_plan = int(get_setting("monthly_plan", "100000"))
 
         players_raw = []
@@ -213,12 +225,14 @@ def get_monthly_progress(guild_id: str):
             gp_now = data["gp"]
             gp_prev = prev.get(pid, gp_now)
             diff = gp_now - gp_prev
+            daily_diff = gp_now - prev_snapshot_gp.get(pid, gp_now)
             players_raw.append({
                 "id": pid,
                 "name": data["name"],
                 "gp": gp_now,
                 "gp_prev": gp_prev,
                 "diff": diff,
+                "daily_diff": daily_diff,
                 "diff_pct": round(diff / gp_prev * 100, 2) if gp_prev > 0 else 0,
                 "plan_pct": round(diff / monthly_plan * 100, 1) if monthly_plan > 0 else 0,
                 "join_date": join_dates.get(pid),
@@ -244,6 +258,7 @@ def get_monthly_progress(guild_id: str):
                 "gp": p["gp"],
                 "gp_prev": p["gp_prev"],
                 "diff": p["diff"],
+                "daily_diff": p["daily_diff"],
                 "diff_pct": p["diff_pct"],
                 "plan_pct": p["plan_pct"],
                 "streak": streak,
