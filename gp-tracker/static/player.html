@@ -257,7 +257,9 @@
             <div class="unit-card-icon" x-text="change.combat_type === 2 ? '🚀' : '⚔️'"></div>
           </template>
           <div class="unit-card-name" x-text="change.name"></div>
-          <div x-show="change.stars" style="font-size:11px;color:#fbbf24;line-height:1;" x-text="'★'.repeat(change.stars)"></div>
+          <div x-show="change.stars" style="font-size:11px;line-height:1;">
+            <span style="color:#fbbf24;" x-text="'★'.repeat(change.stars)"></span><span style="color:#374151;" x-text="'★'.repeat(7 - change.stars)"></span>
+          </div>
           <div class="unit-card-change" x-html="formatCardChangeHtml(change)"></div>
         </div>
       </template>
