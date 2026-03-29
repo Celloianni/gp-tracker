@@ -695,8 +695,17 @@ function playerApp() {
       const skills  = changes.filter(c => c.field === 'ability' || c.field === 'ability_new');
 
       const parts = [];
-      if (relic)  parts.push(this.formatChangeLabelHtml(relic));
-      if (gear)   parts.push(this.formatChangeLabelHtml(gear));
+      if (relic && gear) {
+        // Combined: G12 → R1 (skipping intermediate G13)
+        const fromLabel = `G${gear.from}`;
+        const fromColor = this.gearTierColor(gear.from);
+        const toLabel = relic.to <= 2 ? 'G13' : `R${relic.to - 2}`;
+        const toColor = this.relicTierColor(relic.to);
+        parts.push(`${s(fromLabel, fromColor)} → ${s(toLabel, toColor)}`);
+      } else {
+        if (relic) parts.push(this.formatChangeLabelHtml(relic));
+        if (gear)  parts.push(this.formatChangeLabelHtml(gear));
+      }
       if (level)  parts.push(this.formatChangeLabelHtml(level));
       if (stars)  parts.push(this.formatChangeLabelHtml(stars));
       if (skills.length === 1) parts.push(this.formatChangeLabelHtml(skills[0]));
