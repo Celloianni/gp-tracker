@@ -619,13 +619,22 @@ function playerApp() {
       const lines = cell.changes.map(c => {
         if (c.type === 'new') return `<span>${c.name} <b style="color:#34d399">NEW</b></span>`;
         const changes = c.changes || [];
-        const main = changes.find(x => x.field === 'relic_tier')
-                  || changes.find(x => x.field === 'gear_tier')
-                  || changes.find(x => x.field === 'level')
-                  || changes.find(x => x.field === 'stars')
-                  || changes.find(x => x.field === 'ability' || x.field === 'ability_new');
-        if (!main) return null;
-        const label = this.formatChangeLabel(main);
+        const relic = changes.find(x => x.field === 'relic_tier');
+        const gear  = changes.find(x => x.field === 'gear_tier');
+        let label;
+        if (relic && gear) {
+          // Combined: G12 → R1
+          const toLabel = relic.to <= 2 ? 'G13' : `R${relic.to - 2}`;
+          label = `G${gear.from} → ${toLabel}`;
+        } else {
+          const main = relic
+                    || gear
+                    || changes.find(x => x.field === 'level')
+                    || changes.find(x => x.field === 'stars')
+                    || changes.find(x => x.field === 'ability' || x.field === 'ability_new');
+          if (!main) return null;
+          label = this.formatChangeLabel(main);
+        }
         return `<span>${c.name} <b style="color:#34d399">${label}</b></span>`;
       }).filter(x => x !== null);
       const visible = lines.slice(0, 4);
