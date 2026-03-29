@@ -43,8 +43,6 @@ def _fmt_change(c: dict) -> str:
 
 def _generate_month_block(player_name: str, player_id: str, year: int, month: int) -> str:
     import calendar as cal_mod
-    SEP  = "=" * 80
-    SEP2 = "-" * 80
     month_str   = f"{year}-{str(month).zfill(2)}"
     month_label = f"{EN_MONTHS[month]} {year}"
     last_day    = cal_mod.monthrange(year, month)[1]
@@ -54,16 +52,16 @@ def _generate_month_block(player_name: str, player_id: str, year: int, month: in
     gp = get_player_gp_for_period(player_id, date_from, date_to)
     month_data = get_roster_changes_for_month(player_id, month_str)
 
-    lines = [SEP, f"  GP TRACKER -- {player_name}", f"  {month_label}", SEP]
+    lines = [f"GP TRACKER — {player_name} — {month_label}", ""]
 
     if gp["gp_start"] is not None and gp["gp_end"] is not None:
         diff = gp["gp_end"] - gp["gp_start"]
         diff_str = f"+{diff:,}" if diff >= 0 else f"{diff:,}"
-        lines.append(f"GP at start of month:  {gp['gp_start']:,}")
-        lines.append(f"GP at end of month:    {gp['gp_end']:,}")
-        lines.append(f"Growth:                {diff_str}")
+        lines.append(f"  Start:   {gp['gp_start']:,}")
+        lines.append(f"  End:     {gp['gp_end']:,}")
+        lines.append(f"  Growth:  {diff_str}")
     else:
-        lines.append("(No GP data for this month)")
+        lines.append("  (No GP data for this month)")
 
     days_with_changes = []
     days_no_changes   = []
@@ -77,19 +75,17 @@ def _generate_month_block(player_name: str, player_id: str, year: int, month: in
             days_no_changes.append(day_num)
 
     for day_num, date_str, upgrades in days_with_changes:
-        lines.append(SEP2)
-        lines.append(f"  {EN_MONTHS[month]} {day_num}, {year}")
-        lines.append(SEP2)
+        lines.append("")
+        lines.append(f"{EN_MONTHS[month]} {day_num}")
         for change in upgrades:
             labels = ", ".join(_fmt_change(c) for c in change.get("changes", []))
             lines.append(f"  {change['name']:<32} {labels}")
 
-    lines.append(SEP2)
+    lines.append("")
     if days_no_changes:
-        lines.append(f"  Days with no upgrades: {', '.join(str(d) for d in sorted(days_no_changes))}")
+        lines.append(f"Days without upgrades: {', '.join(str(d) for d in sorted(days_no_changes))}")
     else:
-        lines.append("  Days with no upgrades: none")
-    lines.append(SEP)
+        lines.append("Days without upgrades: none")
     return "\n".join(lines)
 COLLECT_PASSWORD = os.getenv("COLLECT_PASSWORD", "")
 DB_PATH = "/data/gp_tracker.db"
